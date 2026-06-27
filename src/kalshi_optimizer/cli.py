@@ -55,6 +55,28 @@ def cmd_scan_arb(config: Config) -> None:
     console.print(table)
 
 
+def cmd_sample(config: Config, sport: str) -> None:
+    """Print the first ~30 live Kalshi markets for a sport (title, prices, key).
+
+    Lets us inspect real market structure before writing model/parse logic.
+    """
+    kalshi = KalshiClient(config.secrets)
+    quotes = kalshi.get_sports_markets(sport)
+    table = Table(title=f"Kalshi {sport} markets (showing up to 30 of {len(quotes)})")
+    table.add_column("title")
+    table.add_column("yes_bid", justify="right")
+    table.add_column("yes_ask", justify="right")
+    table.add_column("event_key")
+    for q in quotes[:30]:
+        table.add_row(
+            q.title[:55],
+            "-" if q.yes_bid is None else f"{q.yes_bid:.2f}",
+            "-" if q.yes_ask is None else f"{q.yes_ask:.2f}",
+            q.event_key or "[dim]none[/dim]",
+        )
+    console.print(table)
+
+
 def cmd_discover(config: Config, term: str) -> None:
     """List Kalshi series whose ticker/title matches ``term`` (case-insensitive).
 
@@ -198,12 +220,17 @@ def main() -> None:
     sub.add_parser("backtest", help="validation gate report (phase 3)")
     p_discover = sub.add_parser("discover", help="find Kalshi series tickers by keyword")
     p_discover.add_argument("term", help="search term, e.g. 'world cup' or soccer")
+    p_sample = sub.add_parser("sample", help="print sample live Kalshi markets for a sport")
+    p_sample.add_argument("sport", help="sport key, e.g. mlb or soccer")
 
     args = parser.parse_args()
     config = Config.load(args.config)
 
     if args.command == "discover":
         cmd_discover(config, args.term)
+        return
+    if args.command == "sample":
+        cmd_sample(config, args.sport)
         return
 
     {
