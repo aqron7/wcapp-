@@ -3,298 +3,349 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Kalshi Edge — floodlit tote board</title>
+<title>Kalshi Edge — the ledger</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
   :root{
-    --pitch:#0B1A12;        /* floodlit pitch at night */
-    --pitch-2:#0F2318;      /* raised panel */
-    --chalk:#EAF2EC;        /* pitch lines / primary text */
-    --chalk-dim:#8AA395;    /* muted */
-    --turf:#2A5A3C;         /* dividers, chalk-on-grass */
-    --flood:#F5C451;        /* floodlight amber — the signature */
-    --flag:#E5533C;         /* linesman's flag — caution */
-    --grass-line:rgba(234,242,236,.10);
+    --paper:#E7EEDD;          /* pale accounting-pad green */
+    --card:#F4F7EC;           /* lighter leaf */
+    --rule:rgba(28,64,84,.14);
+    --grid:rgba(28,64,84,.07);
+    --ink:#16242B;            /* ballpoint near-black */
+    --blue:#1D4E89;           /* ledger ink blue */
+    --green:#1B7A3D;          /* won */
+    --red:#BE2A1C;            /* lost / margin / negative */
+    --hl:#F4ED5A;             /* highlighter */
+    --pencil:#5F7064;         /* muted */
   }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
-    background:var(--pitch);
-    color:var(--chalk);
-    font-family:Inter,system-ui,sans-serif;
-    -webkit-font-smoothing:antialiased;
-    min-height:100vh;
-    /* floodlight glow from the top */
-    background-image:radial-gradient(120% 70% at 50% -10%, rgba(245,196,81,.10), transparent 60%);
+    color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    background-color:var(--paper);
+    background-image:repeating-linear-gradient(var(--paper) 0 27px, var(--rule) 27px 28px);
+    -webkit-font-smoothing:antialiased;min-height:100vh;
   }
-  .mono{font-family:"Space Mono",monospace;font-variant-numeric:tabular-nums}
-  .disp{font-family:"Saira Condensed",sans-serif;letter-spacing:.02em}
+  .mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+  h1,h2,h3,.disp{font-family:"Space Grotesk",sans-serif}
+  .pos{color:var(--green)} .neg{color:var(--red)}
 
-  /* ---- floodlight bar ---- */
-  header{
-    display:flex;align-items:center;gap:18px;
-    padding:16px 28px;border-bottom:1px solid var(--turf);
-    position:sticky;top:0;backdrop-filter:blur(8px);
-    background:linear-gradient(var(--pitch), rgba(11,26,18,.82));z-index:5;
-  }
-  .lamp{width:11px;height:11px;border-radius:50%;background:var(--flood);
-    box-shadow:0 0 14px 2px var(--flood);animation:pulse 3.4s ease-in-out infinite}
-  @keyframes pulse{50%{opacity:.45;box-shadow:0 0 6px 1px var(--flood)}}
-  .brand{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:26px;
-    text-transform:uppercase;letter-spacing:.06em}
-  .brand small{color:var(--chalk-dim);font-weight:500;font-size:13px;
-    letter-spacing:.18em;margin-left:10px}
-  .spacer{flex:1}
-  .badge{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;text-transform:uppercase;
-    letter-spacing:.08em;font-size:14px;padding:7px 13px;border-radius:2px;
-    border:1px solid var(--flag);color:var(--flag);display:flex;gap:8px;align-items:center}
-  .badge.pass{border-color:var(--flood);color:var(--pitch);background:var(--flood)}
-  .badge .tri{font-size:11px}
-  button.ghost{font-family:"Saira Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:.08em;
-    font-weight:600;background:transparent;color:var(--chalk);border:1px solid var(--turf);
-    padding:7px 14px;border-radius:2px;cursor:pointer;font-size:14px}
-  button.ghost:hover{border-color:var(--flood);color:var(--flood)}
+  /* masthead */
+  header{display:flex;align-items:flex-end;gap:18px;max-width:1180px;margin:0 auto;
+    padding:30px 26px 14px;border-bottom:2px solid var(--ink)}
+  header .mark{width:30px;height:30px;border:2px solid var(--ink);border-radius:50%;
+    display:grid;place-items:center;font-family:"Space Grotesk";font-weight:700;margin-bottom:4px}
+  h1{font-weight:700;font-size:30px;letter-spacing:-.01em;text-transform:uppercase;margin:0;line-height:1}
+  h1 em{font-style:normal;color:var(--blue)}
+  header .meta{margin-left:auto;text-align:right;font-family:"IBM Plex Mono";font-size:12px;color:var(--pencil)}
 
-  main{max-width:1080px;margin:0 auto;padding:30px 28px 80px}
-  .eyebrow{font-family:"Saira Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:.22em;
-    font-size:12px;color:var(--chalk-dim);margin:0 0 12px}
+  /* rubber stamp */
+  .stamp{display:inline-flex;align-items:center;gap:6px;font-family:"Space Grotesk";font-weight:700;
+    text-transform:uppercase;letter-spacing:.13em;font-size:12px;padding:5px 11px;border:2px solid currentColor;
+    border-radius:3px;transform:rotate(-4deg);opacity:.9;position:relative}
+  .stamp::after{content:"";position:absolute;inset:2px;border:1px solid currentColor;border-radius:2px;opacity:.45}
+  .stamp.won{color:var(--green)} .stamp.lost{color:var(--red)}
+  .stamp.pending{color:var(--blue)} .stamp.unvalid{color:var(--red)}
 
-  /* ---- hero: the top edge ---- */
-  .hero{background:var(--pitch-2);border:1px solid var(--turf);border-radius:4px;
-    padding:26px 28px;position:relative;overflow:hidden}
-  .hero::before{content:"";position:absolute;inset:0;
-    background:radial-gradient(80% 120% at 85% -20%, rgba(245,196,81,.10), transparent 55%)}
-  .hero .row{display:flex;align-items:flex-start;gap:24px;position:relative}
-  .matchup{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:46px;line-height:.98;
-    text-transform:uppercase}
-  .matchup .vs{color:var(--chalk-dim);font-weight:500;margin:0 12px}
-  .call{margin-left:auto;text-align:right}
-  .call .side{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:34px;color:var(--flood);
-    text-transform:uppercase;line-height:1}
-  .call .stake{color:var(--chalk-dim);font-size:13px;margin-top:6px}
+  main{max-width:1180px;margin:0 auto;padding:24px 26px 90px}
+  .grid2{display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start}
+  .eyebrow{font-family:"Space Grotesk";text-transform:uppercase;letter-spacing:.2em;font-size:12px;
+    color:var(--pencil);margin:0 0 4px}
+  .sub{color:var(--pencil);font-size:12px;margin:0 0 14px}
 
-  /* ---- the edge track (signature) ---- */
-  .track{margin-top:26px;position:relative;height:64px}
-  .baseline{position:absolute;top:38px;left:0;right:0;height:2px;background:var(--grass-line)}
-  .tick{position:absolute;top:30px;width:1px;height:18px;background:var(--grass-line)}
-  .tick span{position:absolute;top:20px;left:50%;transform:translateX(-50%);
-    font-family:"Space Mono";font-size:10px;color:var(--chalk-dim)}
-  .gap{position:absolute;top:35px;height:8px;border-radius:4px;
-    background:linear-gradient(90deg, rgba(245,196,81,.35), var(--flood));
-    box-shadow:0 0 16px rgba(245,196,81,.45)}
-  .marker{position:absolute;top:24px;transform:translateX(-50%);text-align:center}
-  .marker .dot{width:14px;height:14px;border-radius:50%;margin:0 auto}
-  .marker.fair .dot{background:var(--flood);box-shadow:0 0 12px var(--flood)}
-  .marker.price .dot{background:transparent;border:2px solid var(--chalk)}
-  .marker .lbl{font-family:"Space Mono";font-size:11px;margin-top:8px;color:var(--chalk-dim);white-space:nowrap}
-  .marker .val{font-family:"Space Mono";font-weight:700;font-size:13px;color:var(--chalk)}
-  .edgeBig{position:relative;margin-top:4px;font-family:"Space Mono";font-weight:700;
-    font-size:15px;color:var(--flood)}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:2px;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:23px 23px}
+  .card.pad{padding:18px 20px}
+  /* red margin line down the ledger */
+  .ledger{border-left:3px solid var(--red)}
 
-  /* ---- the board ---- */
-  .boardhead{display:flex;align-items:baseline;gap:18px;margin:46px 0 14px}
-  .boardhead .eyebrow{margin:0}
-  .ctrl{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--chalk-dim);
-    font-family:"Space Mono";font-size:12px}
-  input[type=range]{accent-color:var(--flood)}
-  .toggle{display:flex;gap:6px}
-  .chip{font-family:"Saira Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:.06em;font-size:13px;
-    border:1px solid var(--turf);color:var(--chalk-dim);padding:4px 11px;border-radius:2px;cursor:pointer}
-  .chip.on{border-color:var(--flood);color:var(--flood)}
+  /* best-bets rows */
+  .bet{display:grid;grid-template-columns:1fr 132px 120px 78px 64px 34px;gap:14px;align-items:center;
+    padding:13px 16px;border-bottom:1px solid var(--rule)}
+  .bet:last-child{border-bottom:0}
+  .game{font-family:"Space Grotesk";font-weight:600;font-size:16px;text-transform:uppercase;line-height:1.1}
+  .game .tag{display:block;font-family:"IBM Plex Mono";font-size:11px;color:var(--pencil);
+    text-transform:none;font-weight:400;margin-top:3px}
+  .pick{font-family:"Space Grotesk";font-weight:700;font-size:13px;text-transform:uppercase}
+  .pick small{display:block;color:var(--pencil);font-weight:500;font-size:11px;letter-spacing:.04em}
+  .gauge{position:relative;height:16px}
+  .gauge .bl{position:absolute;top:7px;left:0;right:0;height:1px;background:var(--ink);opacity:.3}
+  .gauge .seg{position:absolute;top:6px;height:3px;background:var(--blue)}
+  .gauge .mk{position:absolute;top:3px;width:9px;height:9px;border-radius:50%;transform:translateX(-50%)}
+  .gauge .mk.f{background:var(--blue)} .gauge .mk.p{background:transparent;border:2px solid var(--ink)}
+  .gauge .lab{position:absolute;top:-1px;font-family:"IBM Plex Mono";font-size:10px;color:var(--pencil)}
+  .edge{font-family:"IBM Plex Mono";font-weight:700;color:var(--blue);text-align:right;font-size:14px}
+  .stk{font-family:"IBM Plex Mono";text-align:right;font-size:13px;color:var(--pencil)}
+  .add{width:26px;height:26px;border:1.5px solid var(--ink);background:transparent;border-radius:3px;
+    cursor:pointer;font-size:16px;line-height:1;color:var(--ink)}
+  .add:hover{background:var(--ink);color:var(--card)}
+  .bet.top{position:relative}
+  .bet.top .game::before{content:"";position:absolute;left:4px;right:42%;top:1px;height:19px;
+    background:var(--hl);mix-blend-mode:multiply;transform:skewX(-9deg);z-index:0;opacity:.85}
+  .bet.top .game{position:relative;z-index:1}
 
-  .board{border-top:1px solid var(--turf)}
-  .line{display:grid;grid-template-columns:34px 1fr 150px 1fr 92px 78px;align-items:center;
-    gap:16px;padding:15px 6px;border-bottom:1px solid var(--grass-line)}
-  .line:hover{background:rgba(245,196,81,.04)}
-  .num{font-family:"Space Mono";color:var(--chalk-dim);font-size:13px}
-  .game{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:600;font-size:19px;text-transform:uppercase}
-  .game .sub{display:block;font-family:"Space Mono";font-size:11px;color:var(--chalk-dim);
-    text-transform:none;font-weight:400;margin-top:2px}
-  .pick{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:15px;text-transform:uppercase}
-  .pick.yes{color:var(--flood)} .pick.no{color:var(--chalk)}
-  .minitrack{position:relative;height:20px}
-  .minitrack .bl{position:absolute;top:9px;left:0;right:0;height:2px;background:var(--grass-line)}
-  .minitrack .g{position:absolute;top:7px;height:6px;border-radius:3px;background:var(--flood);
-    box-shadow:0 0 10px rgba(245,196,81,.4)}
-  .minitrack .m{position:absolute;top:4px;width:10px;height:10px;border-radius:50%;transform:translateX(-50%)}
-  .minitrack .m.f{background:var(--flood)} .minitrack .m.p{background:transparent;border:2px solid var(--chalk)}
-  .edge{font-family:"Space Mono";font-weight:700;color:var(--flood);text-align:right}
-  .stk{font-family:"Space Mono";color:var(--chalk);text-align:right}
+  /* bet slip */
+  .slip{position:sticky;top:18px}
+  .slip h3{margin:0 0 2px;font-size:17px;text-transform:uppercase;letter-spacing:.04em}
+  .perf{height:10px;background:radial-gradient(circle at 6px 50%, transparent 0 5px, var(--card) 5px) repeat-x;
+    background-size:14px 10px;border-bottom:1px dashed var(--rule);margin:0 -20px 12px}
+  .leg{display:flex;gap:8px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--rule);font-size:13px}
+  .leg .x{margin-left:auto;cursor:pointer;color:var(--pencil);font-family:"IBM Plex Mono")}
+  .leg .x:hover{color:var(--red)}
+  .leg .lp{font-family:"IBM Plex Mono";color:var(--pencil);font-size:12px}
+  .slip .empty{color:var(--pencil);font-size:13px;padding:14px 0;text-align:center;font-style:italic}
+  .combine{margin-top:12px;border-top:2px solid var(--ink);padding-top:12px;display:grid;
+    grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center}
+  .combine div span{display:block;font-family:"IBM Plex Mono";font-weight:700;font-size:17px}
+  .combine div small{font-family:"Space Grotesk";text-transform:uppercase;letter-spacing:.1em;
+    font-size:10px;color:var(--pencil)}
+  .warn{color:var(--red);font-size:12px;font-family:"IBM Plex Mono";margin:10px 0 0;
+    border-left:2px solid var(--red);padding-left:8px}
+  .stakebar{display:flex;gap:8px;margin-top:14px}
+  .stakebar input{flex:1;font-family:"IBM Plex Mono";font-size:15px;padding:9px 10px;border:1.5px solid var(--ink);
+    background:var(--paper);border-radius:2px;color:var(--ink)}
+  button.primary{font-family:"Space Grotesk";font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+    background:var(--ink);color:var(--card);border:0;padding:9px 16px;border-radius:2px;cursor:pointer;font-size:14px}
+  button.primary:hover{background:var(--blue)}
+  button.minor{font-family:"Space Grotesk";font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+    background:transparent;border:1.5px solid var(--ink);padding:7px 13px;border-radius:2px;cursor:pointer;font-size:13px;color:var(--ink)}
+  button.minor:hover{border-color:var(--blue);color:var(--blue)}
 
-  /* ---- footer panels ---- */
-  .panels{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:46px}
-  .panel{background:var(--pitch-2);border:1px solid var(--turf);border-radius:4px;padding:22px 24px}
-  .stat{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;
-    border-bottom:1px solid var(--grass-line)}
+  /* ledger section */
+  .section{margin-top:30px}
+  .lhead{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+  .totals{margin-left:auto;display:flex;gap:18px;font-family:"IBM Plex Mono";font-size:13px}
+  .totals b{font-weight:700;font-size:16px}
+  .totals span{color:var(--pencil);font-size:11px;display:block;font-family:"Space Grotesk";letter-spacing:.08em;text-transform:uppercase}
+  .pnlcurve{width:100%;height:70px;display:block;margin:6px 0 0}
+  .entry{display:grid;grid-template-columns:120px 1fr 110px 90px;gap:14px;align-items:center;
+    padding:12px 16px;border-bottom:1px solid var(--rule)}
+  .entry:last-child{border-bottom:0}
+  .entry .when{font-family:"IBM Plex Mono";font-size:11px;color:var(--pencil)}
+  .entry .desc{font-family:"Space Grotesk";font-weight:600;font-size:14px;text-transform:uppercase}
+  .entry .desc small{display:block;font-family:"IBM Plex Mono";font-weight:400;font-size:11px;color:var(--pencil);text-transform:none}
+  .entry .amt{font-family:"IBM Plex Mono";font-weight:700;text-align:right;font-size:15px}
+
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:30px}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule)}
   .stat:last-child{border-bottom:0}
-  .stat .k{color:var(--chalk-dim);font-size:13px}
-  .stat .v{font-family:"Space Mono";font-weight:700;font-size:18px}
-  .v.good{color:var(--flood)} .v.bad{color:var(--flag)}
+  .stat .k{color:var(--pencil);font-size:13px}
+  .stat .v{font-family:"IBM Plex Mono";font-weight:700;font-size:16px}
+  .note{color:var(--pencil);font-size:12px;line-height:1.6;margin:12px 0 0}
+  .empty{padding:26px 16px;color:var(--pencil);font-family:"IBM Plex Mono";font-size:13px;line-height:1.7}
+  .errbox div{border-left:2px solid var(--red);padding:8px 12px;margin:10px 0;color:var(--red);
+    font-family:"IBM Plex Mono";font-size:12px;background:rgba(190,42,28,.05)}
 
-  .empty{padding:40px 6px;color:var(--chalk-dim);font-family:"Space Mono";font-size:14px;line-height:1.7}
-  .warn{border-left:2px solid var(--flag);padding:10px 14px;margin:14px 0;color:var(--flag);
-    font-family:"Space Mono";font-size:12px;background:rgba(229,83,60,.06)}
-
-  @media (max-width:760px){
-    .matchup{font-size:32px}.line{grid-template-columns:26px 1fr 70px 64px;}
-    .line .minitrack,.line .stk{display:none}.panels{grid-template-columns:1fr}
-  }
-  @media (prefers-reduced-motion:reduce){.lamp{animation:none}*{transition:none!important}}
+  @media (max-width:880px){.grid2{grid-template-columns:1fr}.slip{position:static}
+    .bet{grid-template-columns:1fr 90px 60px 30px}.bet .gauge,.bet .stk{display:none}
+    .panels{grid-template-columns:1fr}.entry{grid-template-columns:1fr 90px}.entry .when,.entry .desc small{display:none}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <header>
-  <span class="lamp"></span>
-  <span class="brand">Kalshi Edge<small>WORLD CUP · MLB</small></span>
-  <span class="spacer"></span>
-  <span id="gate" class="badge"><span class="tri">▲</span> UNVALIDATED</span>
-  <button class="ghost" id="refresh">⟳ Refresh</button>
+  <span class="mark">K</span>
+  <h1>Kalshi Edge <em>Ledger</em></h1>
+  <div class="meta">
+    <div id="today">—</div>
+    <div id="gatestamp"><span class="stamp unvalid">▲ Unvalidated</span></div>
+  </div>
 </header>
 
 <main>
-  <p class="eyebrow">Top edge right now</p>
-  <section class="hero" id="hero">
-    <div class="empty">Reading the board…</div>
+  <div class="errbox" id="errbox"></div>
+  <div class="grid2">
+    <!-- best bets -->
+    <section>
+      <p class="eyebrow">Today's best bets</p>
+      <p class="sub">Ranked by model edge. Altitude, host and recent-form adjustments fold into the
+        fair value when a venue is known. These are signals — not advice — until the ledger's CLV turns positive.</p>
+      <div class="card" id="bestbets"><div class="empty">Reading the board…</div></div>
+    </section>
+
+    <!-- bet slip -->
+    <aside class="slip">
+      <div class="card pad">
+        <h3>Bet slip</h3>
+        <div class="perf"></div>
+        <div id="legs"><div class="empty">Tap ＋ on a bet to add a leg.<br>Two or more legs = parlay.</div></div>
+        <div class="combine" id="combine" style="display:none">
+          <div><span id="cFair">—</span><small>model</small></div>
+          <div><span id="cPrice">—</span><small>cost</small></div>
+          <div><span id="cEdge">—</span><small>edge</small></div>
+        </div>
+        <div id="corr"></div>
+        <div class="stakebar">
+          <input id="stake" class="mono" type="number" placeholder="stake $" min="0" />
+          <button class="primary" id="place">Place</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ledger -->
+  <section class="section">
+    <div class="lhead">
+      <div><p class="eyebrow" style="margin:0">The ledger</p>
+        <p class="sub" style="margin:2px 0 0">Every bet you place, settled against results.</p></div>
+      <div class="totals" id="totals"></div>
+    </div>
+    <div class="card ledger">
+      <svg class="pnlcurve" id="curve" preserveAspectRatio="none"></svg>
+      <div id="entries"><div class="empty">No bets logged yet. Place one from the board above, then “Settle” once games finish.</div></div>
+    </div>
+    <div style="margin-top:12px"><button class="minor" id="settle">Settle results</button></div>
   </section>
 
-  <div id="errbox"></div>
-
-  <div class="boardhead">
-    <p class="eyebrow">The board</p>
-    <div class="ctrl">
-      <span class="toggle" id="sports">
-        <span class="chip on" data-s="soccer">Soccer</span>
-        <span class="chip on" data-s="mlb">MLB</span>
-      </span>
-      <span>min edge</span>
-      <input type="range" id="minedge" min="0" max="15" value="3" />
-      <span id="minlbl">3%</span>
-    </div>
-  </div>
-  <section class="board" id="board"></section>
-
   <div class="panels">
-    <div class="panel">
+    <div class="card pad">
       <p class="eyebrow">Validation gate</p>
       <div id="gatepanel"><div class="empty">…</div></div>
-      <p style="color:var(--chalk-dim);font-size:12px;margin:14px 0 0;line-height:1.6">
-        The gate opens once enough games settle. Don't stake real money until
-        <b style="color:var(--chalk)">mean CLV is positive</b> — that's the proof the model beats the closing line.
-      </p>
+      <p class="note">Don't stake real money until <b>mean CLV is positive</b> — proof the model beats the closing line.</p>
     </div>
-    <div class="panel">
+    <div class="card pad">
       <p class="eyebrow">Data log</p>
       <div id="logpanel"><div class="empty">…</div></div>
-      <button class="ghost" id="snap" style="margin-top:16px">📸 Take snapshot now</button>
+      <div style="margin-top:14px"><button class="minor" id="snap">📸 Snapshot now</button></div>
     </div>
   </div>
 </main>
 
 <script>
-const $ = s => document.querySelector(s);
-const pct = x => (x*100).toFixed(0);
-const state = { sports:["soccer","mlb"], minEdge:0.03 };
+const $=s=>document.querySelector(s), pc=x=>(x*100).toFixed(0);
+const state={ edges:[], slip:[], minEdge:0.03 };
+$("#today").textContent = new Date().toISOString().slice(0,10);
 
-function trackMarkers(fair, price){
-  const lo = Math.min(fair,price)*100, hi = Math.max(fair,price)*100;
-  return `
-    <div class="baseline"></div>
-    ${[0,25,50,75,100].map(t=>`<div class="tick" style="left:${t}%"><span>${t}</span></div>`).join("")}
-    <div class="gap" style="left:${lo}%;width:${hi-lo}%"></div>
-    <div class="marker fair" style="left:${fair*100}%"><div class="dot"></div>
-      <div class="lbl">model</div><div class="val">${fair.toFixed(2)}</div></div>
-    <div class="marker price" style="left:${price*100}%"><div class="dot"></div>
-      <div class="lbl">market</div><div class="val">${price.toFixed(2)}</div></div>`;
+function gauge(fair, price){
+  const lo=Math.min(fair,price)*100, hi=Math.max(fair,price)*100;
+  return `<div class="bl"></div><div class="seg" style="left:${lo}%;width:${hi-lo}%"></div>
+    <div class="mk f" style="left:${fair*100}%"></div><div class="mk p" style="left:${price*100}%"></div>`;
 }
+function pickName(t){ const m=t.match(/\[(.*?)\]/); return m?m[1]:t; }
+function gameName(t){ return t.replace(/ Winner\?.*/,"").replace(/\s*\[.*?\]/,""); }
 
-function renderHero(e){
-  if(!e){ $("#hero").innerHTML =
-    `<div class="empty">The board's quiet — no model–market gap above ${pct(state.minEdge)}% right now.
-     Lower the threshold, or wait for the lines to move.</div>`; return; }
-  const game = e.title.replace(/ Winner\?.*/,"").replace(/\s*\[.*?\]/,"");
-  const [a, b] = game.split(" vs ");
-  $("#hero").innerHTML = `
-    <div class="row">
-      <div class="matchup">${a||game}<span class="vs">vs</span>${b||""}</div>
-      <div class="call"><div class="side">${e.side.toUpperCase()} · ${pickName(e)}</div>
-        <div class="stake">stake $${e.stake.toFixed(2)} · model ${pct(e.fair)}% vs market ${pct(e.price)}%</div></div>
-    </div>
-    <div class="track">${trackMarkers(e.fair, e.price)}</div>
-    <div class="edgeBig">+${(e.edge*100).toFixed(1)}% edge — the lit gap is your margin</div>`;
-}
-function pickName(e){
-  const m = e.title.match(/\[(.*?)\]/); return m? m[1] : "";
-}
-
-function renderBoard(edges){
-  const b = $("#board");
-  if(!edges.length){ b.innerHTML = `<div class="empty">No edges above ${pct(state.minEdge)}%. The sharper the market, the quieter this gets — that's expected.</div>`; return; }
-  b.innerHTML = edges.map((e,i)=>`
-    <div class="line">
-      <div class="num">${String(i+1).padStart(2,"0")}</div>
-      <div class="game">${e.title.replace(/ Winner\?.*/,"").replace(/\s*\[.*?\]/,"")}
-        <span class="sub">${pickName(e)} · ${e.sport}</span></div>
-      <div class="pick ${e.side}">${e.side} · ${pickName(e)}</div>
-      <div class="minitrack">
-        <div class="bl"></div>
-        <div class="g" style="left:${Math.min(e.fair,e.price)*100}%;width:${Math.abs(e.fair-e.price)*100}%"></div>
-        <div class="m f" style="left:${e.fair*100}%"></div>
-        <div class="m p" style="left:${e.price*100}%"></div>
-      </div>
+function renderBest(){
+  const el=$("#bestbets");
+  if(!state.edges.length){ el.innerHTML=`<div class="empty">The board's quiet — no model–market gap above ${pc(state.minEdge)}% with live prices right now.</div>`; return; }
+  el.innerHTML = state.edges.slice(0,30).map((e,i)=>`
+    <div class="bet ${i===0?'top':''}">
+      <div class="game">${gameName(e.title)}<span class="tag">${pickName(e.title)} · ${e.sport}</span></div>
+      <div class="pick">${e.side} · ${pickName(e.title)}<small>fair .${e.fair.toFixed(2).slice(2)} · mkt .${e.price.toFixed(2).slice(2)}</small></div>
+      <div class="gauge">${gauge(e.fair, e.price)}</div>
       <div class="edge">+${(e.edge*100).toFixed(1)}%</div>
       <div class="stk">$${e.stake.toFixed(0)}</div>
+      <button class="add" data-i="${i}">＋</button>
     </div>`).join("");
+  el.querySelectorAll(".add").forEach(b=> b.onclick=()=>addLeg(state.edges[+b.dataset.i]));
+}
+
+function addLeg(e){
+  if(state.slip.find(l=>l.market_id===e.market_id)) return;
+  state.slip.push({market_id:e.market_id, event_ticker:e.event_ticker, outcome:e.outcome,
+    side:e.side, price:e.price, fair_side:e.fair_side, label:pickName(e.title),
+    sport:e.sport, game:gameName(e.title)});
+  renderSlip();
+}
+function rmLeg(i){ state.slip.splice(i,1); renderSlip(); }
+
+function renderSlip(){
+  const wrap=$("#legs");
+  if(!state.slip.length){ wrap.innerHTML=`<div class="empty">Tap ＋ on a bet to add a leg.<br>Two or more legs = parlay.</div>`;
+    $("#combine").style.display="none"; $("#corr").innerHTML=""; return; }
+  wrap.innerHTML = state.slip.map((l,i)=>`<div class="leg">
+    <div><b>${l.side.toUpperCase()} · ${l.label}</b><div class="lp">${l.game} — pay .${l.price.toFixed(2).slice(2)}</div></div>
+    <span class="x" data-i="${i}">✕</span></div>`).join("");
+  wrap.querySelectorAll(".x").forEach(x=> x.onclick=()=>rmLeg(+x.dataset.i));
+  const price=state.slip.reduce((a,l)=>a*l.price,1), fair=state.slip.reduce((a,l)=>a*l.fair_side,1);
+  $("#combine").style.display="grid";
+  $("#cFair").textContent="."+fair.toFixed(2).slice(2);
+  $("#cPrice").textContent="."+price.toFixed(2).slice(2);
+  const edge=fair-price; const ce=$("#cEdge"); ce.textContent=(edge>=0?"+":"")+(edge*100).toFixed(1)+"%";
+  ce.className=edge>=0?"pos":"neg";
+  const events=state.slip.map(l=>l.event_ticker);
+  $("#corr").innerHTML = (new Set(events).size!==events.length)
+    ? `<div class="warn">⚠ Two legs are in the same game — they're correlated, so the combined edge is overstated.</div>`:"";
+}
+
+async function place(){
+  if(!state.slip.length) return;
+  const stake=parseFloat($("#stake").value)||0;
+  if(stake<=0){ $("#stake").focus(); return; }
+  const r=await fetch("/api/bets",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({legs:state.slip, stake, sport:state.slip[0].sport})});
+  const d=await r.json();
+  if(d.ok){ state.slip=[]; $("#stake").value=""; renderSlip(); loadLedger(); }
+}
+
+function stamp(s){ return `<span class="stamp ${s}">${s==='won'?'✔ Won':s==='lost'?'✘ Lost':'• Pending'}</span>`; }
+
+function renderLedger(d){
+  const t=d.summary, T=$("#totals");
+  const fmt=(v,suf="")=> v==null?"—":(v>=0?"+":"")+v+suf;
+  T.innerHTML = `
+    <div><span>P&L</span><b class="${t.pnl>=0?'pos':'neg'}">${t.pnl==null?'—':'$'+t.pnl.toFixed(0)}</b></div>
+    <div><span>ROI</span><b>${t.roi==null?'—':(t.roi*100).toFixed(1)+'%'}</b></div>
+    <div><span>Win rate</span><b>${t.win_rate==null?'—':(t.win_rate*100).toFixed(0)+'%'}</b></div>
+    <div><span>Mean CLV</span><b class="${(t.mean_clv||0)>=0?'pos':'neg'}">${t.mean_clv==null?'—':fmt(+(t.mean_clv*100).toFixed(1),'%')}</b></div>`;
+  drawCurve(t.curve||[]);
+  const E=$("#entries");
+  if(!d.bets.length){ E.innerHTML=`<div class="empty">No bets logged yet. Place one from the board above, then “Settle” once games finish.</div>`; return; }
+  E.innerHTML = d.bets.map(b=>`<div class="entry">
+    <div class="when">${(b.placed_ts||'').replace('T',' ').slice(5,16)}<br>${b.kind}</div>
+    <div class="desc">${b.description}<small>stake $${b.stake.toFixed(0)} · model .${(b.fair_prob||0).toFixed(2).slice(2)} · cost .${(b.entry_price||0).toFixed(2).slice(2)}</small></div>
+    <div>${stamp(b.status)}</div>
+    <div class="amt ${ (b.pnl||0)>=0?'pos':'neg'}">${b.pnl==null?'—':(b.pnl>=0?'+':'')+'$'+b.pnl.toFixed(0)}</div>
+  </div>`).join("");
+}
+
+function drawCurve(curve){
+  const svg=$("#curve"); const W=600,H=70,p=4;
+  if(curve.length<2){ svg.innerHTML=`<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="var(--rule)"/>`; svg.setAttribute("viewBox",`0 0 ${W} ${H}`); return; }
+  const ys=[0,...curve]; const min=Math.min(...ys),max=Math.max(...ys),rng=(max-min)||1;
+  const pts=ys.map((v,i)=>`${p+i*(W-2*p)/(ys.length-1)},${H-p-((v-min)/rng)*(H-2*p)}`).join(" ");
+  const zeroY=H-p-((0-min)/rng)*(H-2*p);
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.innerHTML=`<line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="var(--rule)" stroke-dasharray="3 3"/>
+    <polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2"/>`;
 }
 
 async function loadEdges(){
-  const q = new URLSearchParams({sports:state.sports.join(","), min_edge:state.minEdge});
   try{
-    const r = await fetch("/api/edges?"+q); const d = await r.json();
-    $("#errbox").innerHTML = (d.errors||[]).map(e=>`<div class="warn">⚠ ${e}</div>`).join("");
-    renderHero(d.edges[0]); renderBoard(d.edges.slice(0,40));
-  }catch(err){ $("#errbox").innerHTML = `<div class="warn">⚠ ${err}</div>`; }
+    const r=await fetch("/api/edges?sports=soccer,mlb&min_edge="+state.minEdge);
+    const d=await r.json();
+    $("#errbox").innerHTML=(d.errors||[]).map(e=>`<div>⚠ ${e}</div>`).join("");
+    state.edges=d.edges||[]; renderBest();
+    if(state.edges[0]) $("#stake").placeholder="stake $ (sugg "+state.edges[0].stake.toFixed(0)+")";
+  }catch(err){ $("#errbox").innerHTML=`<div>⚠ ${err}</div>`; }
 }
-
+async function loadLedger(){ const r=await fetch("/api/bets"); renderLedger(await r.json()); }
 async function loadGate(){
-  const r = await fetch("/api/backtest?min_edge="+state.minEdge); const d = await r.json();
-  const badge = $("#gate");
-  if(d.passes){ badge.className="badge pass"; badge.innerHTML="✓ VALIDATED"; }
-  else { badge.className="badge"; badge.innerHTML='<span class="tri">▲</span> UNVALIDATED'; }
-  const p = $("#gatepanel");
-  if(!d.n){ p.innerHTML = `<div class="empty">No settled bets scored yet. Collecting as games finish.</div>`; return; }
-  const clvGood = d.clv>0;
-  p.innerHTML = `
-    <div class="stat"><span class="k">Bets scored</span><span class="v">${d.n}</span></div>
-    <div class="stat"><span class="k">Brier (lower better)</span><span class="v ${d.brier<0.25?'good':'bad'}">${d.brier}</span></div>
-    <div class="stat"><span class="k">Mean closing-line value</span><span class="v ${clvGood?'good':'bad'}">${(d.clv*100>=0?'+':'')+(d.clv*100).toFixed(2)}%</span></div>`;
+  const d=await (await fetch("/api/backtest?min_edge="+state.minEdge)).json();
+  $("#gatestamp").innerHTML = d.passes? `<span class="stamp won">✔ Validated</span>`:`<span class="stamp unvalid">▲ Unvalidated</span>`;
+  const p=$("#gatepanel");
+  if(!d.n){ p.innerHTML=`<div class="empty">No settled bets scored yet. Collecting as games finish.</div>`; return; }
+  p.innerHTML=`<div class="stat"><span class="k">Bets scored</span><span class="v">${d.n}</span></div>
+    <div class="stat"><span class="k">Brier (↓ better)</span><span class="v ${d.brier<.25?'pos':'neg'}">${d.brier}</span></div>
+    <div class="stat"><span class="k">Mean CLV</span><span class="v ${d.clv>=0?'pos':'neg'}">${(d.clv*100>=0?'+':'')+(d.clv*100).toFixed(2)}%</span></div>`;
 }
-
-async function loadStats(){
-  const r = await fetch("/api/stats"); const d = await r.json();
-  $("#logpanel").innerHTML = `
-    <div class="stat"><span class="k">Snapshot rows</span><span class="v">${(d.rows||0).toLocaleString()}</span></div>
+async function loadLog(){
+  const d=await (await fetch("/api/stats")).json();
+  $("#logpanel").innerHTML=`<div class="stat"><span class="k">Snapshot rows</span><span class="v">${(d.rows||0).toLocaleString()}</span></div>
     <div class="stat"><span class="k">Markets tracked</span><span class="v">${(d.markets||0).toLocaleString()}</span></div>
     <div class="stat"><span class="k">Settled markets</span><span class="v">${(d.settled||0).toLocaleString()}</span></div>
-    <div class="stat"><span class="k">Last snapshot</span><span class="v" style="font-size:13px">${d.last? d.last.replace('T',' ').slice(0,16):'—'}</span></div>`;
+    <div class="stat"><span class="k">Last snapshot</span><span class="v" style="font-size:12px">${d.last?d.last.replace('T',' ').slice(0,16):'—'}</span></div>`;
 }
 
-function refreshAll(){ loadEdges(); loadGate(); loadStats(); }
+$("#place").onclick=place;
+$("#settle").onclick=async()=>{ await fetch("/api/bets/settle",{method:"POST"}); loadLedger(); loadGate(); };
+$("#snap").onclick=async e=>{ e.target.textContent="📸 …"; const d=await(await fetch("/api/snapshot",{method:"POST"})).json();
+  e.target.textContent=d.ok?`✔ ${d.rows} rows`:"⚠ failed"; setTimeout(()=>e.target.textContent="📸 Snapshot now",2500); loadLog(); };
 
-$("#refresh").onclick = refreshAll;
-$("#snap").onclick = async (e)=>{ e.target.textContent="📸 Snapshotting…";
-  const r = await fetch("/api/snapshot",{method:"POST"}); const d = await r.json();
-  e.target.textContent = d.ok? `✓ ${d.rows} rows` : "⚠ failed"; setTimeout(()=>e.target.textContent="📸 Take snapshot now",2500); loadStats(); };
-$("#minedge").oninput = (e)=>{ state.minEdge = e.target.value/100; $("#minlbl").textContent=e.target.value+"%"; };
-$("#minedge").onchange = ()=>{ loadEdges(); loadGate(); };
-document.querySelectorAll("#sports .chip").forEach(c=> c.onclick = ()=>{
-  c.classList.toggle("on");
-  state.sports = [...document.querySelectorAll("#sports .chip.on")].map(x=>x.dataset.s);
-  loadEdges();
-});
-
-refreshAll();
+loadEdges(); loadLedger(); loadGate(); loadLog();
 </script>
 </body>
 </html>
