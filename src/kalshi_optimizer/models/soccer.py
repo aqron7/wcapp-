@@ -53,3 +53,11 @@ class SoccerModel:
         draw = self.max_draw * (1.0 - abs(2.0 * p_raw - 1.0))
         remaining = 1.0 - draw
         return remaining * p_raw, draw, remaining * (1.0 - p_raw)
+
+    def contextual_match_probs(self, team_a: str, team_b: str, ctx):
+        """match_probs with altitude/host/form adjustments; returns (probs, why)."""
+        from .context import adjust
+
+        adj_a, adj_b, breakdown = adjust(team_a, team_b, ctx)
+        probs = self.match_probs(team_a, team_b, a_advantage=adj_a - adj_b)
+        return probs, breakdown

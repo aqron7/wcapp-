@@ -12,11 +12,13 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
-from . import storage
+from . import ledger, storage
 from .backtest.backtester import score_from_db
 from .config import Config
 from .data.kalshi import KalshiClient
+from .engine.parlay import combine, has_correlated_legs
 from .engine.value import find_value_edges, predictions_for_sport
 
 app = FastAPI(title="Kalshi Edge")
@@ -43,12 +45,17 @@ def api_edges(sports: str = "soccer,mlb", min_edge: float = 0.03,
             quotes = kalshi.get_sports_markets(sport)
             preds = predictions_for_sport(sport, quotes)
             for idea in find_value_edges(quotes, preds, config):
+                side_fair = idea.fair_prob if idea.side.value == "yes" else 1 - idea.fair_prob
                 edges.append({
                     "sport": sport,
                     "title": idea.title,
+                    "market_id": idea.market_id,
+                    "event_ticker": idea.market_id.rsplit("-", 1)[0],
+                    "outcome": idea.market_id.rsplit("-", 1)[-1],
                     "side": idea.side.value,
                     "price": round(idea.price, 2),
                     "fair": round(idea.fair_prob, 2),
+                    "fair_side": round(side_fair, 2),
                     "edge": round(idea.edge, 4),
                     "stake": idea.stake,
                     "why": idea.rationale,
@@ -92,3 +99,44 @@ def api_snapshot() -> dict:
         return {"ok": True, "rows": n}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)}
+
+
+class BetIn(BaseModel):
+    legs: list[dict]
+    stake: float
+    sport: str = ""
+
+
+@app.post("/api/parlay/quote")
+def api_parlay_quote(bet: BetIn) -> dict:
+    c = combine(bet.legs)
+    c["correlated"] = has_correlated_legs(bet.legs)
+    c["legs"] = len(bet.legs)
+    return c
+
+
+@app.get("/api/bets")
+def api_bets() -> dict:
+    conn = storage.connect()
+    import json as _json
+    bets = []
+    for b in storage.list_bets(conn):
+        b["legs"] = _json.loads(b.pop("legs_json"))
+        bets.append(b)
+    return {"bets": bets, "summary": ledger.summary(conn)}
+
+
+@app.post("/api/bets")
+def api_place_bet(bet: BetIn) -> dict:
+    if not bet.legs or bet.stake <= 0:
+        return {"ok": False, "error": "need legs and a positive stake"}
+    conn = storage.connect()
+    bet_id = ledger.record_bet(conn, bet.legs, bet.stake, bet.sport)
+    return {"ok": True, "id": bet_id}
+
+
+@app.post("/api/bets/settle")
+def api_settle() -> dict:
+    conn = storage.connect()
+    n = ledger.settle_pending(conn)
+    return {"settled": n, "summary": ledger.summary(conn)}
