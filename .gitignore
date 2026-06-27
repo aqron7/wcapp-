@@ -4,8 +4,8 @@ config.yaml
 *.pem
 kalshi_*.key
 
-# Local data / DB
-data/
+# Local data / DB (project-root only; do NOT match src/.../data package)
+/data/
 *.sqlite
 *.db
 *.csv
