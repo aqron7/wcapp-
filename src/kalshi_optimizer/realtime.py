@@ -98,10 +98,18 @@ async def _refresh_universe(book: LiveBook, config: Config, client: KalshiClient
         await asyncio.sleep(600)  # refresh every 10 min to pick up new games
 
 
-async def _run_ws(book: LiveBook, client: KalshiClient) -> None:
-    """Connect, subscribe to ticker updates, and keep the book live (with reconnect)."""
+def _ws_connect(url: str, headers: dict):
+    """websockets renamed extra_headers -> additional_headers in v14; support both."""
     import websockets
 
+    try:
+        return websockets.connect(url, additional_headers=headers, ping_interval=10)
+    except TypeError:
+        return websockets.connect(url, extra_headers=headers, ping_interval=10)
+
+
+async def _run_ws(book: LiveBook, client: KalshiClient) -> None:
+    """Connect, subscribe to ticker updates, and keep the book live (with reconnect)."""
     backoff = 1
     while True:
         # Wait until we know which markets to subscribe to.
@@ -110,7 +118,7 @@ async def _run_ws(book: LiveBook, client: KalshiClient) -> None:
             continue
         try:
             url, headers = client.ws_connect_args()
-            async with websockets.connect(url, extra_headers=headers, ping_interval=10) as ws:
+            async with _ws_connect(url, headers) as ws:
                 book.connected = True
                 book.error = None
                 backoff = 1
