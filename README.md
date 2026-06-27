@@ -23,7 +23,19 @@ cp .env.example .env            # add your Kalshi API credentials
 cp config.example.yaml config.yaml
 
 python -m kalshi_optimizer --help
+
+# See the arb scanner work end-to-end on bundled fixtures (no keys/network):
+python -m kalshi_optimizer demo-arb
+
+# Live cross-platform arbitrage scan (needs Kalshi key + open network):
+python -m kalshi_optimizer --config config.yaml scan-arb
 ```
+
+> Note: `scan-arb` reaches Kalshi (`api.elections.kalshi.com`) and Polymarket
+> (`gamma-api.polymarket.com`). It runs locally where you have your key and an
+> open network; in a restricted/sandboxed network it will report each fetch
+> failure and continue. Use `demo-arb` to exercise the full parse → match →
+> scan pipeline offline.
 
 ## Project layout
 

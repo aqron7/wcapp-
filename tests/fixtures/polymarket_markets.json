@@ -1,0 +1,41 @@
+[
+  {
+    "id": "0x123",
+    "conditionId": "0xabc",
+    "question": "Yankees vs. Red Sox — will the Yankees win?",
+    "slug": "mlb-yankees-red-sox-2026-06-27",
+    "closed": false,
+    "active": true,
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.60\", \"0.40\"]",
+    "bestBid": 0.60,
+    "bestAsk": 0.62,
+    "endDate": "2026-06-27T23:05:00Z"
+  },
+  {
+    "id": "0x456",
+    "conditionId": "0xdef",
+    "question": "Will the Dodgers beat the Giants?",
+    "slug": "mlb-dodgers-giants-2026-06-27",
+    "closed": false,
+    "active": true,
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.62\", \"0.38\"]",
+    "bestBid": 0.62,
+    "bestAsk": 0.64,
+    "endDate": "2026-06-27T22:10:00Z"
+  },
+  {
+    "id": "0x999",
+    "conditionId": "0xggg",
+    "question": "Will it rain in Seattle tomorrow?",
+    "slug": "weather-seattle",
+    "closed": false,
+    "active": true,
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.30\", \"0.70\"]",
+    "bestBid": 0.29,
+    "bestAsk": 0.31,
+    "endDate": "2026-06-28T00:00:00Z"
+  }
+]
