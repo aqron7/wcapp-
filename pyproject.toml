@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dashboard = ["streamlit>=1.31"]
+dashboard = ["fastapi>=0.110", "uvicorn>=0.29"]
 dev = ["pytest>=8.0", "ruff>=0.3", "mypy>=1.9"]
 
 [project.scripts]

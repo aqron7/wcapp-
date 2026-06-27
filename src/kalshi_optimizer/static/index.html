@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kalshi Edge — floodlit tote board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --pitch:#0B1A12;        /* floodlit pitch at night */
+    --pitch-2:#0F2318;      /* raised panel */
+    --chalk:#EAF2EC;        /* pitch lines / primary text */
+    --chalk-dim:#8AA395;    /* muted */
+    --turf:#2A5A3C;         /* dividers, chalk-on-grass */
+    --flood:#F5C451;        /* floodlight amber — the signature */
+    --flag:#E5533C;         /* linesman's flag — caution */
+    --grass-line:rgba(234,242,236,.10);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--pitch);
+    color:var(--chalk);
+    font-family:Inter,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    /* floodlight glow from the top */
+    background-image:radial-gradient(120% 70% at 50% -10%, rgba(245,196,81,.10), transparent 60%);
+  }
+  .mono{font-family:"Space Mono",monospace;font-variant-numeric:tabular-nums}
+  .disp{font-family:"Saira Condensed",sans-serif;letter-spacing:.02em}
+
+  /* ---- floodlight bar ---- */
+  header{
+    display:flex;align-items:center;gap:18px;
+    padding:16px 28px;border-bottom:1px solid var(--turf);
+    position:sticky;top:0;backdrop-filter:blur(8px);
+    background:linear-gradient(var(--pitch), rgba(11,26,18,.82));z-index:5;
+  }
+  .lamp{width:11px;height:11px;border-radius:50%;background:var(--flood);
+    box-shadow:0 0 14px 2px var(--flood);animation:pulse 3.4s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.45;box-shadow:0 0 6px 1px var(--flood)}}
+  .brand{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:26px;
+    text-transform:uppercase;letter-spacing:.06em}
+  .brand small{color:var(--chalk-dim);font-weight:500;font-size:13px;
+    letter-spacing:.18em;margin-left:10px}
+  .spacer{flex:1}
+  .badge{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;text-transform:uppercase;
+    letter-spacing:.08em;font-size:14px;padding:7px 13px;border-radius:2px;
+    border:1px solid var(--flag);color:var(--flag);display:flex;gap:8px;align-items:center}
+  .badge.pass{border-color:var(--flood);color:var(--pitch);background:var(--flood)}
+  .badge .tri{font-size:11px}
+  button.ghost{font-family:"Saira Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:.08em;
+    font-weight:600;background:transparent;color:var(--chalk);border:1px solid var(--turf);
+    padding:7px 14px;border-radius:2px;cursor:pointer;font-size:14px}
+  button.ghost:hover{border-color:var(--flood);color:var(--flood)}
+
+  main{max-width:1080px;margin:0 auto;padding:30px 28px 80px}
+  .eyebrow{font-family:"Saira Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:.22em;
+    font-size:12px;color:var(--chalk-dim);margin:0 0 12px}
+
+  /* ---- hero: the top edge ---- */
+  .hero{background:var(--pitch-2);border:1px solid var(--turf);border-radius:4px;
+    padding:26px 28px;position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(80% 120% at 85% -20%, rgba(245,196,81,.10), transparent 55%)}
+  .hero .row{display:flex;align-items:flex-start;gap:24px;position:relative}
+  .matchup{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:46px;line-height:.98;
+    text-transform:uppercase}
+  .matchup .vs{color:var(--chalk-dim);font-weight:500;margin:0 12px}
+  .call{margin-left:auto;text-align:right}
+  .call .side{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:34px;color:var(--flood);
+    text-transform:uppercase;line-height:1}
+  .call .stake{color:var(--chalk-dim);font-size:13px;margin-top:6px}
+
+  /* ---- the edge track (signature) ---- */
+  .track{margin-top:26px;position:relative;height:64px}
+  .baseline{position:absolute;top:38px;left:0;right:0;height:2px;background:var(--grass-line)}
+  .tick{position:absolute;top:30px;width:1px;height:18px;background:var(--grass-line)}
+  .tick span{position:absolute;top:20px;left:50%;transform:translateX(-50%);
+    font-family:"Space Mono";font-size:10px;color:var(--chalk-dim)}
+  .gap{position:absolute;top:35px;height:8px;border-radius:4px;
+    background:linear-gradient(90deg, rgba(245,196,81,.35), var(--flood));
+    box-shadow:0 0 16px rgba(245,196,81,.45)}
+  .marker{position:absolute;top:24px;transform:translateX(-50%);text-align:center}
+  .marker .dot{width:14px;height:14px;border-radius:50%;margin:0 auto}
+  .marker.fair .dot{background:var(--flood);box-shadow:0 0 12px var(--flood)}
+  .marker.price .dot{background:transparent;border:2px solid var(--chalk)}
+  .marker .lbl{font-family:"Space Mono";font-size:11px;margin-top:8px;color:var(--chalk-dim);white-space:nowrap}
+  .marker .val{font-family:"Space Mono";font-weight:700;font-size:13px;color:var(--chalk)}
+  .edgeBig{position:relative;margin-top:4px;font-family:"Space Mono";font-weight:700;
+    font-size:15px;color:var(--flood)}
+
+  /* ---- the board ---- */
+  .boardhead{display:flex;align-items:baseline;gap:18px;margin:46px 0 14px}
+  .boardhead .eyebrow{margin:0}
+  .ctrl{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--chalk-dim);
+    font-family:"Space Mono";font-size:12px}
+  input[type=range]{accent-color:var(--flood)}
+  .toggle{display:flex;gap:6px}
+  .chip{font-family:"Saira Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:.06em;font-size:13px;
+    border:1px solid var(--turf);color:var(--chalk-dim);padding:4px 11px;border-radius:2px;cursor:pointer}
+  .chip.on{border-color:var(--flood);color:var(--flood)}
+
+  .board{border-top:1px solid var(--turf)}
+  .line{display:grid;grid-template-columns:34px 1fr 150px 1fr 92px 78px;align-items:center;
+    gap:16px;padding:15px 6px;border-bottom:1px solid var(--grass-line)}
+  .line:hover{background:rgba(245,196,81,.04)}
+  .num{font-family:"Space Mono";color:var(--chalk-dim);font-size:13px}
+  .game{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:600;font-size:19px;text-transform:uppercase}
+  .game .sub{display:block;font-family:"Space Mono";font-size:11px;color:var(--chalk-dim);
+    text-transform:none;font-weight:400;margin-top:2px}
+  .pick{font-family:"Saira Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:15px;text-transform:uppercase}
+  .pick.yes{color:var(--flood)} .pick.no{color:var(--chalk)}
+  .minitrack{position:relative;height:20px}
+  .minitrack .bl{position:absolute;top:9px;left:0;right:0;height:2px;background:var(--grass-line)}
+  .minitrack .g{position:absolute;top:7px;height:6px;border-radius:3px;background:var(--flood);
+    box-shadow:0 0 10px rgba(245,196,81,.4)}
+  .minitrack .m{position:absolute;top:4px;width:10px;height:10px;border-radius:50%;transform:translateX(-50%)}
+  .minitrack .m.f{background:var(--flood)} .minitrack .m.p{background:transparent;border:2px solid var(--chalk)}
+  .edge{font-family:"Space Mono";font-weight:700;color:var(--flood);text-align:right}
+  .stk{font-family:"Space Mono";color:var(--chalk);text-align:right}
+
+  /* ---- footer panels ---- */
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:46px}
+  .panel{background:var(--pitch-2);border:1px solid var(--turf);border-radius:4px;padding:22px 24px}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;
+    border-bottom:1px solid var(--grass-line)}
+  .stat:last-child{border-bottom:0}
+  .stat .k{color:var(--chalk-dim);font-size:13px}
+  .stat .v{font-family:"Space Mono";font-weight:700;font-size:18px}
+  .v.good{color:var(--flood)} .v.bad{color:var(--flag)}
+
+  .empty{padding:40px 6px;color:var(--chalk-dim);font-family:"Space Mono";font-size:14px;line-height:1.7}
+  .warn{border-left:2px solid var(--flag);padding:10px 14px;margin:14px 0;color:var(--flag);
+    font-family:"Space Mono";font-size:12px;background:rgba(229,83,60,.06)}
+
+  @media (max-width:760px){
+    .matchup{font-size:32px}.line{grid-template-columns:26px 1fr 70px 64px;}
+    .line .minitrack,.line .stk{display:none}.panels{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){.lamp{animation:none}*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <span class="lamp"></span>
+  <span class="brand">Kalshi Edge<small>WORLD CUP · MLB</small></span>
+  <span class="spacer"></span>
+  <span id="gate" class="badge"><span class="tri">▲</span> UNVALIDATED</span>
+  <button class="ghost" id="refresh">⟳ Refresh</button>
+</header>
+
+<main>
+  <p class="eyebrow">Top edge right now</p>
+  <section class="hero" id="hero">
+    <div class="empty">Reading the board…</div>
+  </section>
+
+  <div id="errbox"></div>
+
+  <div class="boardhead">
+    <p class="eyebrow">The board</p>
+    <div class="ctrl">
+      <span class="toggle" id="sports">
+        <span class="chip on" data-s="soccer">Soccer</span>
+        <span class="chip on" data-s="mlb">MLB</span>
+      </span>
+      <span>min edge</span>
+      <input type="range" id="minedge" min="0" max="15" value="3" />
+      <span id="minlbl">3%</span>
+    </div>
+  </div>
+  <section class="board" id="board"></section>
+
+  <div class="panels">
+    <div class="panel">
+      <p class="eyebrow">Validation gate</p>
+      <div id="gatepanel"><div class="empty">…</div></div>
+      <p style="color:var(--chalk-dim);font-size:12px;margin:14px 0 0;line-height:1.6">
+        The gate opens once enough games settle. Don't stake real money until
+        <b style="color:var(--chalk)">mean CLV is positive</b> — that's the proof the model beats the closing line.
+      </p>
+    </div>
+    <div class="panel">
+      <p class="eyebrow">Data log</p>
+      <div id="logpanel"><div class="empty">…</div></div>
+      <button class="ghost" id="snap" style="margin-top:16px">📸 Take snapshot now</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const pct = x => (x*100).toFixed(0);
+const state = { sports:["soccer","mlb"], minEdge:0.03 };
+
+function trackMarkers(fair, price){
+  const lo = Math.min(fair,price)*100, hi = Math.max(fair,price)*100;
+  return `
+    <div class="baseline"></div>
+    ${[0,25,50,75,100].map(t=>`<div class="tick" style="left:${t}%"><span>${t}</span></div>`).join("")}
+    <div class="gap" style="left:${lo}%;width:${hi-lo}%"></div>
+    <div class="marker fair" style="left:${fair*100}%"><div class="dot"></div>
+      <div class="lbl">model</div><div class="val">${fair.toFixed(2)}</div></div>
+    <div class="marker price" style="left:${price*100}%"><div class="dot"></div>
+      <div class="lbl">market</div><div class="val">${price.toFixed(2)}</div></div>`;
+}
+
+function renderHero(e){
+  if(!e){ $("#hero").innerHTML =
+    `<div class="empty">The board's quiet — no model–market gap above ${pct(state.minEdge)}% right now.
+     Lower the threshold, or wait for the lines to move.</div>`; return; }
+  const game = e.title.replace(/ Winner\?.*/,"").replace(/\s*\[.*?\]/,"");
+  const [a, b] = game.split(" vs ");
+  $("#hero").innerHTML = `
+    <div class="row">
+      <div class="matchup">${a||game}<span class="vs">vs</span>${b||""}</div>
+      <div class="call"><div class="side">${e.side.toUpperCase()} · ${pickName(e)}</div>
+        <div class="stake">stake $${e.stake.toFixed(2)} · model ${pct(e.fair)}% vs market ${pct(e.price)}%</div></div>
+    </div>
+    <div class="track">${trackMarkers(e.fair, e.price)}</div>
+    <div class="edgeBig">+${(e.edge*100).toFixed(1)}% edge — the lit gap is your margin</div>`;
+}
+function pickName(e){
+  const m = e.title.match(/\[(.*?)\]/); return m? m[1] : "";
+}
+
+function renderBoard(edges){
+  const b = $("#board");
+  if(!edges.length){ b.innerHTML = `<div class="empty">No edges above ${pct(state.minEdge)}%. The sharper the market, the quieter this gets — that's expected.</div>`; return; }
+  b.innerHTML = edges.map((e,i)=>`
+    <div class="line">
+      <div class="num">${String(i+1).padStart(2,"0")}</div>
+      <div class="game">${e.title.replace(/ Winner\?.*/,"").replace(/\s*\[.*?\]/,"")}
+        <span class="sub">${pickName(e)} · ${e.sport}</span></div>
+      <div class="pick ${e.side}">${e.side} · ${pickName(e)}</div>
+      <div class="minitrack">
+        <div class="bl"></div>
+        <div class="g" style="left:${Math.min(e.fair,e.price)*100}%;width:${Math.abs(e.fair-e.price)*100}%"></div>
+        <div class="m f" style="left:${e.fair*100}%"></div>
+        <div class="m p" style="left:${e.price*100}%"></div>
+      </div>
+      <div class="edge">+${(e.edge*100).toFixed(1)}%</div>
+      <div class="stk">$${e.stake.toFixed(0)}</div>
+    </div>`).join("");
+}
+
+async function loadEdges(){
+  const q = new URLSearchParams({sports:state.sports.join(","), min_edge:state.minEdge});
+  try{
+    const r = await fetch("/api/edges?"+q); const d = await r.json();
+    $("#errbox").innerHTML = (d.errors||[]).map(e=>`<div class="warn">⚠ ${e}</div>`).join("");
+    renderHero(d.edges[0]); renderBoard(d.edges.slice(0,40));
+  }catch(err){ $("#errbox").innerHTML = `<div class="warn">⚠ ${err}</div>`; }
+}
+
+async function loadGate(){
+  const r = await fetch("/api/backtest?min_edge="+state.minEdge); const d = await r.json();
+  const badge = $("#gate");
+  if(d.passes){ badge.className="badge pass"; badge.innerHTML="✓ VALIDATED"; }
+  else { badge.className="badge"; badge.innerHTML='<span class="tri">▲</span> UNVALIDATED'; }
+  const p = $("#gatepanel");
+  if(!d.n){ p.innerHTML = `<div class="empty">No settled bets scored yet. Collecting as games finish.</div>`; return; }
+  const clvGood = d.clv>0;
+  p.innerHTML = `
+    <div class="stat"><span class="k">Bets scored</span><span class="v">${d.n}</span></div>
+    <div class="stat"><span class="k">Brier (lower better)</span><span class="v ${d.brier<0.25?'good':'bad'}">${d.brier}</span></div>
+    <div class="stat"><span class="k">Mean closing-line value</span><span class="v ${clvGood?'good':'bad'}">${(d.clv*100>=0?'+':'')+(d.clv*100).toFixed(2)}%</span></div>`;
+}
+
+async function loadStats(){
+  const r = await fetch("/api/stats"); const d = await r.json();
+  $("#logpanel").innerHTML = `
+    <div class="stat"><span class="k">Snapshot rows</span><span class="v">${(d.rows||0).toLocaleString()}</span></div>
+    <div class="stat"><span class="k">Markets tracked</span><span class="v">${(d.markets||0).toLocaleString()}</span></div>
+    <div class="stat"><span class="k">Settled markets</span><span class="v">${(d.settled||0).toLocaleString()}</span></div>
+    <div class="stat"><span class="k">Last snapshot</span><span class="v" style="font-size:13px">${d.last? d.last.replace('T',' ').slice(0,16):'—'}</span></div>`;
+}
+
+function refreshAll(){ loadEdges(); loadGate(); loadStats(); }
+
+$("#refresh").onclick = refreshAll;
+$("#snap").onclick = async (e)=>{ e.target.textContent="📸 Snapshotting…";
+  const r = await fetch("/api/snapshot",{method:"POST"}); const d = await r.json();
+  e.target.textContent = d.ok? `✓ ${d.rows} rows` : "⚠ failed"; setTimeout(()=>e.target.textContent="📸 Take snapshot now",2500); loadStats(); };
+$("#minedge").oninput = (e)=>{ state.minEdge = e.target.value/100; $("#minlbl").textContent=e.target.value+"%"; };
+$("#minedge").onchange = ()=>{ loadEdges(); loadGate(); };
+document.querySelectorAll("#sports .chip").forEach(c=> c.onclick = ()=>{
+  c.classList.toggle("on");
+  state.sports = [...document.querySelectorAll("#sports .chip.on")].map(x=>x.dataset.s);
+  loadEdges();
+});
+
+refreshAll();
+</script>
+</body>
+</html>

@@ -233,6 +233,18 @@ def cmd_demo_edges(config: Config) -> None:
     _render_ideas(ideas, "MLB value edges (demo fixtures)")
 
 
+def cmd_dashboard(config: Config) -> None:
+    """Launch the web dashboard (FastAPI + custom frontend)."""
+    try:
+        import uvicorn  # noqa: F401
+    except ImportError:
+        console.print("[yellow]Dashboard needs extra deps:[/yellow] pip install -e \".[dashboard]\"")
+        return
+    console.print("[bold]Kalshi Edge[/bold] dashboard → http://127.0.0.1:8000  (Ctrl+C to stop)")
+    import uvicorn
+    uvicorn.run("kalshi_optimizer.web:app", host="127.0.0.1", port=8000, log_level="warning")
+
+
 def cmd_snapshot(config: Config) -> None:
     """Record one snapshot of live prices + model fair values to the DB."""
     from .logger import run_snapshot
@@ -275,6 +287,7 @@ def main() -> None:
     sub.add_parser("demo-arb", help="run arb scanner on bundled fixtures (no network)")
     sub.add_parser("find-edges", help="ranked model-vs-Kalshi value bets (phase 2+)")
     sub.add_parser("demo-edges", help="run value engine on bundled fixtures (no network)")
+    sub.add_parser("dashboard", help="launch the web dashboard (phase 5)")
     sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
     sub.add_parser("backtest", help="validation gate report (phase 3)")
     p_discover = sub.add_parser("discover", help="find Kalshi series tickers by keyword")
@@ -302,6 +315,7 @@ def main() -> None:
         "demo-arb": cmd_demo_arb,
         "find-edges": cmd_find_edges,
         "demo-edges": cmd_demo_edges,
+        "dashboard": cmd_dashboard,
         "snapshot": cmd_snapshot,
         "backtest": cmd_backtest,
     }[args.command](config)

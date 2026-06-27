@@ -30,7 +30,12 @@ python -m kalshi_optimizer demo-edges    # model-vs-Kalshi value bets
 
 # Live (needs Kalshi key + open network):
 python -m kalshi_optimizer --config config.yaml scan-arb     # arbitrage
-python -m kalshi_optimizer --config config.yaml find-edges   # MLB value bets
+python -m kalshi_optimizer --config config.yaml find-edges   # value bets
+python -m kalshi_optimizer snapshot                          # log prices for backtest
+python -m kalshi_optimizer backtest                          # validation gate report
+
+# Web dashboard (the "floodlit tote board") — needs: pip install -e ".[dashboard]"
+python -m kalshi_optimizer dashboard      # then open http://127.0.0.1:8000
 ```
 
 > Note: `scan-arb` reaches Kalshi (`api.elections.kalshi.com`) and Polymarket
