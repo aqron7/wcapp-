@@ -233,9 +233,38 @@ def cmd_demo_edges(config: Config) -> None:
     _render_ideas(ideas, "MLB value edges (demo fixtures)")
 
 
+def cmd_snapshot(config: Config) -> None:
+    """Record one snapshot of live prices + model fair values to the DB."""
+    from .logger import run_snapshot
+
+    try:
+        n = run_snapshot(config)
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[yellow]snapshot failed:[/yellow] {exc}")
+        return
+    console.print(f"Recorded [bold]{n}[/bold] market rows to data/snapshots.db")
+
+
 def cmd_backtest(config: Config) -> None:
-    console.print("[bold]Backtest[/bold] (phase 3) — not yet implemented.")
-    # TODO(phase3): load history, run backtest.run_backtest, print pass/fail gate.
+    """Score the model against accumulated snapshot history (the gate)."""
+    from .backtest.backtester import score_from_db
+
+    result = score_from_db(min_edge=config.edge.min_edge)
+    if result.n == 0:
+        console.print(
+            "[yellow]No scorable markets yet.[/yellow] Run 'snapshot' regularly so "
+            "entry prices, closing prices, and settled results can accumulate."
+        )
+        return
+    table = Table(title="Backtest / validation gate")
+    table.add_column("metric")
+    table.add_column("value", justify="right")
+    table.add_row("bets scored", str(result.n))
+    table.add_row("Brier score", f"{result.brier:.4f}  (lower better, <0.25)")
+    table.add_row("log loss", f"{result.log_loss:.4f}")
+    table.add_row("mean CLV", f"{result.mean_clv * 100:+.2f}%  (want > 0)")
+    table.add_row("PASSES GATE", "✅ yes" if result.passes_gate else "❌ not yet")
+    console.print(table)
 
 
 def main() -> None:
@@ -246,6 +275,7 @@ def main() -> None:
     sub.add_parser("demo-arb", help="run arb scanner on bundled fixtures (no network)")
     sub.add_parser("find-edges", help="ranked model-vs-Kalshi value bets (phase 2+)")
     sub.add_parser("demo-edges", help="run value engine on bundled fixtures (no network)")
+    sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
     sub.add_parser("backtest", help="validation gate report (phase 3)")
     p_discover = sub.add_parser("discover", help="find Kalshi series tickers by keyword")
     p_discover.add_argument("term", help="search term, e.g. 'world cup' or soccer")
@@ -272,6 +302,7 @@ def main() -> None:
         "demo-arb": cmd_demo_arb,
         "find-edges": cmd_find_edges,
         "demo-edges": cmd_demo_edges,
+        "snapshot": cmd_snapshot,
         "backtest": cmd_backtest,
     }[args.command](config)
 

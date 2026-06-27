@@ -143,6 +143,23 @@ class KalshiClient:
                     break
         return out
 
+    def iter_raw_markets(self, sport: str, status: str | None = None):
+        """Yield raw market dicts for a sport, paging all series (for logging
+        settlements). ``status`` filters server-side, e.g. "settled"."""
+        for series in SPORT_SERIES.get(sport, []):
+            cursor: str | None = None
+            while True:
+                params: dict = {"series_ticker": series, "limit": 200}
+                if status:
+                    params["status"] = status
+                if cursor:
+                    params["cursor"] = cursor
+                payload = self._get("/markets", params=params)
+                yield from payload.get("markets", [])
+                cursor = payload.get("cursor")
+                if not cursor:
+                    break
+
     def get_orderbook(self, ticker: str) -> dict:
         """Raw orderbook for a single market (for arb depth + execution sizing)."""
         return self._get(f"/markets/{ticker}/orderbook")

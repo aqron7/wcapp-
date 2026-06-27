@@ -19,6 +19,21 @@ from .fair_value import blend
 from .sizing import stake
 
 
+def predictions_for_sport(sport: str, quotes: list[MarketQuote]) -> list[Prediction]:
+    """Build model predictions for a sport's quotes (used by find-edges + logger)."""
+    if sport == "mlb":
+        from ..models.baseball import BaseballModel
+
+        model = BaseballModel()  # TODO(phase2): fit real ratings
+        preds: list[Prediction] = []
+        for event_ticker, home, away in matchups_from_quotes(quotes, "mlb"):
+            preds += model.predict_matchup(event_ticker, home, away)
+        return preds
+    if sport == "soccer":
+        return soccer_predictions(quotes, SoccerModel())
+    return []
+
+
 def _clean_label(label: str | None) -> str:
     """Strip Kalshi's 'Reg Time: ' prefix from soccer outcome labels."""
     if not label:

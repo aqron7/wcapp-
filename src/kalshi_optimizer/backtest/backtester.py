@@ -59,16 +59,58 @@ def run_backtest(
     entry_prices: list[float],
     closing_prices: list[float],
 ) -> BacktestResult:
-    """Compute the full validation report over historical predictions.
-
-    TODO(phase3):
-      - Load historical model predictions + actual results + Kalshi closing
-        prices from the snapshot DB.
-      - Optionally bucket by sport / market type for per-segment CLV.
-    """
+    """Compute the full validation report over historical predictions."""
     return BacktestResult(
         n=len(probs),
         brier=brier_score(probs, outcomes),
         log_loss=log_loss(probs, outcomes),
         mean_clv=closing_line_value(entry_prices, closing_prices),
     )
+
+
+def score_from_db(db_path: str | None = None, min_edge: float = 0.03) -> BacktestResult:
+    """Build the validation report from the snapshot DB.
+
+    For each market it derives an entry (first liquid snapshot with a model
+    fair value), a closing price (last liquid snapshot), and the settled
+    result. Only markets where the model had an edge >= ``min_edge`` at entry
+    count toward the score. Prices are expressed in terms of the side we'd have
+    bought, so positive mean CLV means our entry beat the closing line.
+    """
+    from collections import defaultdict
+
+    from .. import storage
+
+    conn = storage.connect(db_path or storage.DEFAULT_DB)
+    cur = conn.execute(
+        "SELECT market_id, ts, yes_bid, yes_ask, model_fair, status, result "
+        "FROM snapshots ORDER BY ts"
+    )
+    markets: dict[str, dict] = defaultdict(lambda: {"entries": [], "result": None})
+    for market_id, ts, yes_bid, yes_ask, fair, status, result in cur:
+        m = markets[market_id]
+        if status == "settled" and result in ("yes", "no"):
+            m["result"] = result
+        elif status == "active" and yes_bid is not None and yes_ask is not None and fair is not None:
+            m["entries"].append((ts, (yes_bid + yes_ask) / 2.0, fair))
+
+    probs: list[float] = []
+    outcomes: list[int] = []
+    entry_prices: list[float] = []
+    closing_prices: list[float] = []
+    for m in markets.values():
+        if m["result"] is None or not m["entries"]:
+            continue
+        m["entries"].sort()
+        _, entry_yes, fair = m["entries"][0]
+        _, closing_yes, _ = m["entries"][-1]
+        if abs(fair - entry_yes) < min_edge:
+            continue  # we wouldn't have bet this market
+        bet_yes = fair >= entry_yes
+        probs.append(fair)
+        outcomes.append(1 if m["result"] == "yes" else 0)
+        # Express prices for the side we bought (YES price, or the NO price).
+        entry_prices.append(entry_yes if bet_yes else 1.0 - entry_yes)
+        closing_prices.append(closing_yes if bet_yes else 1.0 - closing_yes)
+
+    return run_backtest(probs, outcomes, entry_prices, closing_prices)
