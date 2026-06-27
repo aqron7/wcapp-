@@ -55,6 +55,47 @@ def cmd_scan_arb(config: Config) -> None:
     console.print(table)
 
 
+def cmd_discover(config: Config, term: str) -> None:
+    """List Kalshi series whose ticker/title matches ``term`` (case-insensitive).
+
+    Use this to find the real series_ticker for a sport, e.g.:
+        python -m kalshi_optimizer discover "world cup"
+        python -m kalshi_optimizer discover soccer
+    """
+    kalshi = KalshiClient(config.secrets)
+    term_low = term.lower()
+    table = Table(title=f"Kalshi series matching '{term}'")
+    table.add_column("series_ticker")
+    table.add_column("title")
+    table.add_column("category")
+
+    cursor: str | None = None
+    matched = 0
+    while True:
+        params: dict = {"limit": 200}
+        if cursor:
+            params["cursor"] = cursor
+        try:
+            payload = kalshi._get("/series", params=params)
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"[yellow]/series fetch failed:[/yellow] {exc}")
+            return
+        series = payload.get("series", [])
+        for s in series:
+            hay = f"{s.get('ticker', '')} {s.get('title', '')} {s.get('category', '')}".lower()
+            if term_low in hay:
+                table.add_row(s.get("ticker", ""), s.get("title", ""), s.get("category", ""))
+                matched += 1
+        cursor = payload.get("cursor")
+        if not cursor or not series:
+            break
+
+    if matched:
+        console.print(table)
+    else:
+        console.print(f"[dim]No series matched '{term}'.[/dim]")
+
+
 def cmd_demo_arb(config: Config) -> None:
     """Run the arb scanner against bundled fixtures (no network/keys needed)."""
     import json
@@ -155,9 +196,15 @@ def main() -> None:
     sub.add_parser("find-edges", help="ranked model-vs-Kalshi value bets (phase 2+)")
     sub.add_parser("demo-edges", help="run value engine on bundled fixtures (no network)")
     sub.add_parser("backtest", help="validation gate report (phase 3)")
+    p_discover = sub.add_parser("discover", help="find Kalshi series tickers by keyword")
+    p_discover.add_argument("term", help="search term, e.g. 'world cup' or soccer")
 
     args = parser.parse_args()
     config = Config.load(args.config)
+
+    if args.command == "discover":
+        cmd_discover(config, args.term)
+        return
 
     {
         "scan-arb": cmd_scan_arb,
