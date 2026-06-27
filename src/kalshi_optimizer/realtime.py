@@ -19,7 +19,7 @@ import time
 
 from .config import Config
 from .data.kalshi import KalshiClient
-from .engine.value import find_value_edges, predictions_for_sport
+from .engine.value import find_value_edges, predictions_with_context
 from .types import MarketQuote
 
 
@@ -90,7 +90,7 @@ async def _refresh_universe(book: LiveBook, config: Config, client: KalshiClient
             for sport in config.sports:
                 qs = await loop.run_in_executor(None, client.get_sports_markets, sport)
                 quotes += qs
-                preds += predictions_for_sport(sport, qs)
+                preds += predictions_with_context(sport, qs)
             book.seed(quotes, preds)
             book.error = None
         except Exception as exc:  # noqa: BLE001

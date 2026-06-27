@@ -31,6 +31,17 @@ NATION_HOME_ALTITUDE_M: dict[str, int] = {
     "costa rica": 1170, "honduras": 990, "south africa": 1750,
 }
 
+# MLB ballpark elevation (metres), keyed by home-team Kalshi code. Coors (COL)
+# is the outlier that actually matters; altitude mainly inflates run totals, so
+# it feeds totals markets more than winner markets.
+BALLPARK_ALTITUDE_M: dict[str, int] = {
+    "COL": 1580, "ARI": 340, "ATL": 320, "KC": 270, "MIN": 250, "CIN": 150,
+    "TEX": 170, "MIL": 190, "STL": 140, "CLE": 200, "PIT": 220, "CHC": 180,
+    "CWS": 180, "DET": 180, "WSH": 7, "NYY": 16, "NYM": 8, "BOS": 6, "BAL": 10,
+    "PHI": 12, "TB": 3, "TOR": 76, "HOU": 12, "SEA": 56, "SF": 8, "LAD": 80,
+    "LAA": 48, "SD": 19, "OAK": 13, "ATH": 13, "MIA": 2,
+}
+
 HOST_NATIONS_2026 = {"usa": "usa", "united states": "usa",
                      "canada": "canada", "mexico": "mexico"}
 VENUE_COUNTRY = {  # which host country a venue sits in
@@ -44,6 +55,21 @@ ALT_POINTS_PER_KM = 45      # penalty per km of unacclimatised altitude deficit
 ALT_MAX_PENALTY = 55
 HOST_BONUS = 55
 FORM_POINTS_PER_WIN_RATE = 80   # form delta = (recent_win_rate - 0.5) * this
+
+
+def load_venues(path: str = "data/venues.json") -> dict[str, str]:
+    """Optional map of event_ticker -> venue city (fill to enable soccer
+    altitude/host). Returns {} if the file is absent."""
+    import json
+    import os
+
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path) as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
 
 
 @dataclass

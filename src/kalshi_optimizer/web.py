@@ -21,7 +21,7 @@ from .backtest.backtester import score_from_db
 from .config import Config
 from .data.kalshi import KalshiClient
 from .engine.parlay import combine, has_correlated_legs
-from .engine.value import find_value_edges, predictions_for_sport
+from .engine.value import find_value_edges, predictions_with_context
 
 app = FastAPI(title="Kalshi Edge")
 _INDEX = Path(__file__).with_name("static") / "index.html"
@@ -81,7 +81,7 @@ def api_edges(sports: str = "soccer,mlb", min_edge: float = 0.03,
     for sport in wanted:
         try:
             quotes = kalshi.get_sports_markets(sport)
-            preds = predictions_for_sport(sport, quotes)
+            preds = predictions_with_context(sport, quotes)
             edges += [_edge_dict(i, sport) for i in find_value_edges(quotes, preds, config)]
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{sport}: {exc}")

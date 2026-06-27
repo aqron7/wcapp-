@@ -187,8 +187,7 @@ def _mlb_predictions(model: BaseballModel, quotes: list[MarketQuote]) -> list[Pr
 
 def cmd_find_edges(config: Config) -> None:
     """Live: model probabilities vs Kalshi prices -> ranked value bets."""
-    from .engine.value import soccer_predictions
-    from .models.soccer import SoccerModel
+    from .engine.value import predictions_with_context
 
     kalshi = KalshiClient(config.secrets)
     all_ideas: list[TradeIdea] = []
@@ -200,13 +199,9 @@ def cmd_find_edges(config: Config) -> None:
             console.print(f"  [yellow]kalshi/{sport} fetch failed:[/yellow] {exc}")
             continue
 
-        if sport == "mlb":
-            # TODO(phase2): fit real ratings; flat ratings give weak signal.
-            preds = _mlb_predictions(BaseballModel(), quotes)
-        elif sport == "soccer":
-            preds = soccer_predictions(quotes, SoccerModel())
-        else:
+        if sport not in ("mlb", "soccer"):
             continue
+        preds = predictions_with_context(sport, quotes)
 
         ideas = find_value_edges(quotes, preds, config)
         console.print(f"  {sport}: {len(ideas)} edge(s) from {len(quotes)} markets")

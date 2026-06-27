@@ -16,6 +16,18 @@ from .elo import EloModel
 
 MODEL_NAME = "baseball_elo_v1"
 
+# Approximate 2026 team strength (Elo), keyed by Kalshi outcome code. Seeded
+# guesses — validate via the backtester before trusting. Athletics appear as
+# "ATH" on Kalshi (alias OAK).
+DEFAULT_MLB_RATINGS: dict[str, float] = {
+    "LAD": 1580, "PHI": 1555, "ATL": 1550, "NYY": 1550, "BAL": 1545, "HOU": 1545,
+    "SEA": 1530, "SD": 1530, "CLE": 1525, "TEX": 1520, "ARI": 1520, "MIL": 1520,
+    "NYM": 1515, "MIN": 1515, "BOS": 1510, "CHC": 1510, "KC": 1510, "TB": 1508,
+    "DET": 1505, "SF": 1505, "TOR": 1502, "STL": 1498, "CIN": 1492, "PIT": 1480,
+    "LAA": 1472, "WSH": 1470, "MIA": 1465, "ATH": 1458, "OAK": 1458, "COL": 1448,
+    "CWS": 1438, "CHW": 1438,
+}
+
 
 @dataclass
 class GameResult:
@@ -30,6 +42,7 @@ class BaseballModel:
     def __init__(self) -> None:
         # MLB-calibrated-ish defaults: low K (long season), modest home edge.
         self.elo = EloModel(k=4.0, home_advantage=24.0)
+        self.elo.ratings.update(DEFAULT_MLB_RATINGS)
 
     def fit(self, games: list[GameResult]) -> None:
         """Update ratings over a chronological list of historical games."""

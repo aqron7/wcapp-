@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from . import storage
 from .config import Config
 from .data.kalshi import KalshiClient
-from .engine.value import predictions_for_sport
+from .engine.value import predictions_with_context
 
 
 def run_snapshot(config: Config, db_path: str = storage.DEFAULT_DB) -> int:
@@ -25,7 +25,8 @@ def run_snapshot(config: Config, db_path: str = storage.DEFAULT_DB) -> int:
     for sport in config.sports:
         # Active markets: record prices + the model's current fair value.
         quotes = kalshi.get_sports_markets(sport)
-        fair = {(p.event_key, p.outcome): p.fair_prob for p in predictions_for_sport(sport, quotes)}
+        fair = {(p.event_key, p.outcome): p.fair_prob
+                for p in predictions_with_context(sport, quotes)}
         for q in quotes:
             rows.append((
                 ts, sport, q.event_key, q.market_id, q.outcome,

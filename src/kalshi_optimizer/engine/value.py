@@ -19,18 +19,45 @@ from .fair_value import blend
 from .sizing import stake
 
 
-def predictions_for_sport(sport: str, quotes: list[MarketQuote]) -> list[Prediction]:
-    """Build model predictions for a sport's quotes (used by find-edges + logger)."""
+def predictions_with_context(sport: str, quotes: list[MarketQuote]) -> list[Prediction]:
+    """predictions_for_sport with recent form (from the DB) + venue data loaded."""
+    from .. import storage
+    from ..form import recent_form
+    from ..models.context import load_venues
+
+    conn = storage.connect()
+    return predictions_for_sport(sport, quotes, recent_form(conn, sport), load_venues())
+
+
+def _form_delta(form: dict | None, code: str) -> float:
+    from ..models.context import FORM_POINTS_PER_WIN_RATE
+    if not form or code not in form:
+        return 0.0
+    return (form[code] - 0.5) * FORM_POINTS_PER_WIN_RATE
+
+
+def predictions_for_sport(sport: str, quotes: list[MarketQuote],
+                          form: dict | None = None, venues: dict | None = None) -> list[Prediction]:
+    """Build model predictions for a sport's quotes (used by find-edges + logger).
+
+    ``form`` maps team code -> recent win rate; ``venues`` maps event_ticker ->
+    venue city (for soccer altitude/host). Both optional.
+    """
     if sport == "mlb":
         from ..models.baseball import BaseballModel
 
-        model = BaseballModel()  # TODO(phase2): fit real ratings
+        model = BaseballModel()
         preds: list[Prediction] = []
         for event_ticker, home, away in matchups_from_quotes(quotes, "mlb"):
-            preds += model.predict_matchup(event_ticker, home, away)
+            # Reuse the Elo-point adjustment params to inject recent form.
+            preds += model.predict_matchup(
+                event_ticker, home, away,
+                home_pitcher_adj=_form_delta(form, home),
+                away_pitcher_adj=_form_delta(form, away),
+            )
         return preds
     if sport == "soccer":
-        return soccer_predictions(quotes, SoccerModel())
+        return soccer_predictions(quotes, SoccerModel(), form, venues)
     return []
 
 
@@ -41,13 +68,15 @@ def _clean_label(label: str | None) -> str:
     return label.split(":", 1)[-1].strip() if ":" in label else label.strip()
 
 
-def soccer_predictions(quotes: list[MarketQuote], model: SoccerModel) -> list[Prediction]:
+def soccer_predictions(quotes: list[MarketQuote], model: SoccerModel,
+                       form: dict | None = None, venues: dict | None = None) -> list[Prediction]:
     """Build W/D/L predictions keyed by (event_ticker, outcome_code).
 
-    Groups a game's markets by event_ticker, reads the two team outcome codes
-    and their country labels, and assigns the model's win/draw/loss probs to the
-    matching outcome codes (the draw goes to the "TIE" code).
+    Applies altitude/host (from ``venues``: event_ticker -> city) and recent
+    form (from ``form``: team code -> win rate) via the context engine.
     """
+    from ..models.context import MatchContext
+
     events: dict[str, dict] = {}
     for q in quotes:
         if q.platform != "kalshi" or q.sport != "soccer" or not q.event_key or not q.outcome:
@@ -62,7 +91,12 @@ def soccer_predictions(quotes: list[MarketQuote], model: SoccerModel) -> list[Pr
         if len(teams) != 2:
             continue
         (code_a, name_a), (code_b, name_b) = teams[0], teams[1]
-        p_a, p_draw, p_b = model.match_probs(name_a, name_b)
+        ctx = MatchContext(
+            venue_city=(venues or {}).get(event_ticker),
+            home_form=(form or {}).get(code_a),
+            away_form=(form or {}).get(code_b),
+        )
+        (p_a, p_draw, p_b), _why = model.contextual_match_probs(name_a, name_b, ctx)
         preds.append(Prediction(event_ticker, code_a, p_a, "soccer", "soccer_elo_v1"))
         preds.append(Prediction(event_ticker, code_b, p_b, "soccer", "soccer_elo_v1"))
         preds.append(Prediction(event_ticker, "TIE", p_draw, "soccer", "soccer_elo_v1"))
