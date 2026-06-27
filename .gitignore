@@ -26,3 +26,7 @@ dist/
 .vscode/
 .idea/
 .DS_Store
+
+# scratch / screenshots
+scratch_*
+*.png
