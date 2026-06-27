@@ -1,0 +1,32 @@
+{
+  "markets": [
+    {
+      "ticker": "KXWCGAME-26JUN29GERCUW-GER",
+      "event_ticker": "KXWCGAME-26JUN29GERCUW",
+      "title": "Germany vs Curacao Winner?",
+      "status": "active",
+      "yes_bid_dollars": "0.9300",
+      "yes_ask_dollars": "0.9400",
+      "yes_sub_title": "Germany"
+    },
+    {
+      "ticker": "KXWCGAME-26JUN29GERCUW-TIE",
+      "event_ticker": "KXWCGAME-26JUN29GERCUW",
+      "title": "Germany vs Curacao Winner?",
+      "status": "active",
+      "yes_bid_dollars": "0.0400",
+      "yes_ask_dollars": "0.0500",
+      "yes_sub_title": "Reg Time: Tie"
+    },
+    {
+      "ticker": "KXWCGAME-26JUN29GERCUW-CUW",
+      "event_ticker": "KXWCGAME-26JUN29GERCUW",
+      "title": "Germany vs Curacao Winner?",
+      "status": "active",
+      "yes_bid_dollars": "0.0200",
+      "yes_ask_dollars": "0.0300",
+      "yes_sub_title": "Curacao"
+    }
+  ],
+  "cursor": ""
+}

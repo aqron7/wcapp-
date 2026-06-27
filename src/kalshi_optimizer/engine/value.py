@@ -12,10 +12,46 @@ unit-tested offline.
 from __future__ import annotations
 
 from ..config import Config
+from ..models.soccer import SoccerModel
 from ..types import MarketQuote, Prediction, Side, TradeIdea
 from .edge import evaluate_market
 from .fair_value import blend
 from .sizing import stake
+
+
+def _clean_label(label: str | None) -> str:
+    """Strip Kalshi's 'Reg Time: ' prefix from soccer outcome labels."""
+    if not label:
+        return ""
+    return label.split(":", 1)[-1].strip() if ":" in label else label.strip()
+
+
+def soccer_predictions(quotes: list[MarketQuote], model: SoccerModel) -> list[Prediction]:
+    """Build W/D/L predictions keyed by (event_ticker, outcome_code).
+
+    Groups a game's markets by event_ticker, reads the two team outcome codes
+    and their country labels, and assigns the model's win/draw/loss probs to the
+    matching outcome codes (the draw goes to the "TIE" code).
+    """
+    events: dict[str, dict] = {}
+    for q in quotes:
+        if q.platform != "kalshi" or q.sport != "soccer" or not q.event_key or not q.outcome:
+            continue
+        info = events.setdefault(q.event_key, {"teams": {}})
+        if q.outcome != "TIE":
+            info["teams"][q.outcome] = _clean_label(q.outcome_label)
+
+    preds: list[Prediction] = []
+    for event_ticker, info in events.items():
+        teams = list(info["teams"].items())  # [(code, country), ...]
+        if len(teams) != 2:
+            continue
+        (code_a, name_a), (code_b, name_b) = teams[0], teams[1]
+        p_a, p_draw, p_b = model.match_probs(name_a, name_b)
+        preds.append(Prediction(event_ticker, code_a, p_a, "soccer", "soccer_elo_v1"))
+        preds.append(Prediction(event_ticker, code_b, p_b, "soccer", "soccer_elo_v1"))
+        preds.append(Prediction(event_ticker, "TIE", p_draw, "soccer", "soccer_elo_v1"))
+    return preds
 
 
 def matchups_from_quotes(

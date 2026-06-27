@@ -187,21 +187,33 @@ def _mlb_predictions(model: BaseballModel, quotes: list[MarketQuote]) -> list[Pr
 
 def cmd_find_edges(config: Config) -> None:
     """Live: model probabilities vs Kalshi prices -> ranked value bets."""
+    from .engine.value import soccer_predictions
+    from .models.soccer import SoccerModel
+
     kalshi = KalshiClient(config.secrets)
-    model = BaseballModel()
-    # TODO(phase2): model.fit(load_historical_games()) — flat ratings until then.
+    all_ideas: list[TradeIdea] = []
 
-    quotes: list[MarketQuote] = []
     for sport in config.sports:
-        if sport != "mlb":
-            continue  # only the MLB model exists so far (soccer is phase 4)
         try:
-            quotes.extend(kalshi.get_sports_markets("mlb"))
+            quotes = kalshi.get_sports_markets(sport)
         except Exception as exc:  # noqa: BLE001
-            console.print(f"  [yellow]kalshi/mlb fetch failed:[/yellow] {exc}")
+            console.print(f"  [yellow]kalshi/{sport} fetch failed:[/yellow] {exc}")
+            continue
 
-    ideas = find_value_edges(quotes, _mlb_predictions(model, quotes), config)
-    _render_ideas(ideas, "MLB value edges (model vs Kalshi)")
+        if sport == "mlb":
+            # TODO(phase2): fit real ratings; flat ratings give weak signal.
+            preds = _mlb_predictions(BaseballModel(), quotes)
+        elif sport == "soccer":
+            preds = soccer_predictions(quotes, SoccerModel())
+        else:
+            continue
+
+        ideas = find_value_edges(quotes, preds, config)
+        console.print(f"  {sport}: {len(ideas)} edge(s) from {len(quotes)} markets")
+        all_ideas.extend(ideas)
+
+    all_ideas.sort(key=lambda i: i.edge, reverse=True)
+    _render_ideas(all_ideas, "Value edges (model vs Kalshi)")
 
 
 def cmd_demo_edges(config: Config) -> None:
