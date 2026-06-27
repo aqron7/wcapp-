@@ -30,7 +30,10 @@ from ..types import MarketQuote
 # confirm/extend against the live GET /series listing for each sport.
 SPORT_SERIES: dict[str, list[str]] = {
     "mlb": ["KXMLBGAME"],
-    "soccer": ["KXWORLDCUP", "KXWCMATCH"],
+    # World Cup: per-match results (KXWCGAME) drive the model/arb; outright
+    # winner (KXMENWORLDCUP) and advancement (KXWCADVANCE) are single-team
+    # futures. Discover more with: python -m kalshi_optimizer discover "world cup"
+    "soccer": ["KXWCGAME", "KXMENWORLDCUP", "KXWCADVANCE"],
 }
 
 
