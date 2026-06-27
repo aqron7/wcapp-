@@ -143,6 +143,24 @@ class KalshiClient:
                     break
         return out
 
+    # ------------------------------------------------------------------ #
+    # WebSocket auth (real-time prices)
+    # ------------------------------------------------------------------ #
+    WS_PATH = "/trade-api/ws/v2"
+
+    def ws_connect_args(self) -> tuple[str, dict[str, str]]:
+        """Return (wss_url, signed_headers) for the real-time feed.
+
+        Derives the ws host from the REST base and signs the ws path with the
+        same RSA scheme. NOTE: if live auth is rejected, the signing path
+        (WS_PATH) is the most likely thing to adjust per Kalshi's docs.
+        """
+        from urllib.parse import urlparse
+
+        host = urlparse(self.base).netloc
+        url = f"wss://{host}{self.WS_PATH}"
+        return url, self._headers("GET", self.WS_PATH)
+
     def iter_raw_markets(self, sport: str, status: str | None = None):
         """Yield raw market dicts for a sport, paging all series (for logging
         settlements). ``status`` filters server-side, e.g. "settled"."""

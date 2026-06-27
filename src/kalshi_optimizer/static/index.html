@@ -41,6 +41,12 @@
   h1{font-weight:700;font-size:30px;letter-spacing:-.01em;text-transform:uppercase;margin:0;line-height:1}
   h1 em{font-style:normal;color:var(--blue)}
   header .meta{margin-left:auto;text-align:right;font-family:"IBM Plex Mono";font-size:12px;color:var(--pencil)}
+  .livepill{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:.04em;display:inline-block}
+  .livepill.on{color:var(--green)}
+  .livepill.on::first-letter{color:var(--green)}
+  .livepill.off{color:var(--pencil)}
+  @keyframes blip{50%{opacity:.3}}
+  .livepill.on{animation:blip 1.6s ease-in-out infinite}
 
   /* rubber stamp */
   .stamp{display:inline-flex;align-items:center;gap:6px;font-family:"Space Grotesk";font-weight:700;
@@ -151,7 +157,8 @@
   <span class="mark">K</span>
   <h1>Kalshi Edge <em>Ledger</em></h1>
   <div class="meta">
-    <div id="today">—</div>
+    <div id="livepill" class="livepill off">● offline · REST</div>
+    <div id="today" style="margin:4px 0">—</div>
     <div id="gatestamp"><span class="stamp unvalid">▲ Unvalidated</span></div>
   </div>
 </header>
@@ -345,7 +352,31 @@ $("#settle").onclick=async()=>{ await fetch("/api/bets/settle",{method:"POST"});
 $("#snap").onclick=async e=>{ e.target.textContent="📸 …"; const d=await(await fetch("/api/snapshot",{method:"POST"})).json();
   e.target.textContent=d.ok?`✔ ${d.rows} rows`:"⚠ failed"; setTimeout(()=>e.target.textContent="📸 Snapshot now",2500); loadLog(); };
 
+// --- real-time feed (falls back to the REST load above if ws is down) ---
+function connectWS(){
+  let proto = location.protocol==="https:"?"wss":"ws";
+  let ws;
+  try{ ws = new WebSocket(`${proto}://${location.host}/ws`); }catch(e){ return; }
+  ws.onmessage = ev=>{
+    const d = JSON.parse(ev.data);
+    const pill = $("#livepill");
+    if(d.live){
+      state.edges = (d.edges||[]).filter(e=>e.edge>=state.minEdge);
+      renderBest();
+      pill.className="livepill on";
+      pill.textContent = "● live · ws"+(d.last_update?" · "+new Date(d.last_update*1000).toLocaleTimeString():"");
+    } else {
+      pill.className="livepill off";
+      pill.textContent = "● offline · REST";
+    }
+  };
+  ws.onclose = ()=>{ $("#livepill").className="livepill off"; $("#livepill").textContent="● offline · REST";
+    setTimeout(connectWS, 4000); };
+  ws.onerror = ()=>{ try{ws.close();}catch(e){} };
+}
+
 loadEdges(); loadLedger(); loadGate(); loadLog();
+connectWS();
 </script>
 </body>
 </html>

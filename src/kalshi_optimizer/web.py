@@ -10,11 +10,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+import asyncio
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-from . import ledger, storage
+from . import ledger, realtime, storage
 from .backtest.backtester import score_from_db
 from .config import Config
 from .data.kalshi import KalshiClient
@@ -23,6 +25,24 @@ from .engine.value import find_value_edges, predictions_for_sport
 
 app = FastAPI(title="Kalshi Edge")
 _INDEX = Path(__file__).with_name("static") / "index.html"
+LIVE = realtime.LiveBook()
+
+
+def _edge_dict(idea, sport: str) -> dict:
+    side_fair = idea.fair_prob if idea.side.value == "yes" else 1 - idea.fair_prob
+    return {
+        "sport": sport, "title": idea.title, "market_id": idea.market_id,
+        "event_ticker": idea.market_id.rsplit("-", 1)[0],
+        "outcome": idea.market_id.rsplit("-", 1)[-1],
+        "side": idea.side.value, "price": round(idea.price, 2),
+        "fair": round(idea.fair_prob, 2), "fair_side": round(side_fair, 2),
+        "edge": round(idea.edge, 4), "stake": idea.stake, "why": idea.rationale,
+    }
+
+
+@app.on_event("startup")
+async def _start_realtime() -> None:
+    asyncio.create_task(realtime.maintain(LIVE, Config.load()))
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -30,40 +50,68 @@ def index() -> str:
     return _INDEX.read_text(encoding="utf-8")
 
 
+def _sport_of(market_id: str) -> str:
+    return "mlb" if "MLB" in market_id else "soccer"
+
+
+def _config(min_edge: float, kelly: float, bankroll: float) -> Config:
+    c = Config.load()
+    c.bankroll = bankroll
+    c.edge.min_edge = min_edge
+    c.sizing.kelly_fraction = kelly
+    return c
+
+
 @app.get("/api/edges")
 def api_edges(sports: str = "soccer,mlb", min_edge: float = 0.03,
               kelly: float = 0.25, bankroll: float = 1000.0) -> dict:
-    config = Config.load()
-    config.bankroll = bankroll
-    config.edge.min_edge = min_edge
-    config.sizing.kelly_fraction = kelly
+    config = _config(min_edge, kelly, bankroll)
+    wanted = [s for s in sports.split(",") if s]
 
+    # Prefer the live ws book when it's connected and populated.
+    if LIVE.connected and LIVE.markets:
+        edges = [_edge_dict(i, _sport_of(i.market_id)) for i in LIVE.edges(config)
+                 if _sport_of(i.market_id) in wanted]
+        edges.sort(key=lambda e: e["edge"], reverse=True)
+        return {"edges": edges, "errors": [], "live": True}
+
+    # Fallback: fetch fresh over REST.
     kalshi = KalshiClient(config.secrets)
     edges, errors = [], []
-    for sport in [s for s in sports.split(",") if s]:
+    for sport in wanted:
         try:
             quotes = kalshi.get_sports_markets(sport)
             preds = predictions_for_sport(sport, quotes)
-            for idea in find_value_edges(quotes, preds, config):
-                side_fair = idea.fair_prob if idea.side.value == "yes" else 1 - idea.fair_prob
-                edges.append({
-                    "sport": sport,
-                    "title": idea.title,
-                    "market_id": idea.market_id,
-                    "event_ticker": idea.market_id.rsplit("-", 1)[0],
-                    "outcome": idea.market_id.rsplit("-", 1)[-1],
-                    "side": idea.side.value,
-                    "price": round(idea.price, 2),
-                    "fair": round(idea.fair_prob, 2),
-                    "fair_side": round(side_fair, 2),
-                    "edge": round(idea.edge, 4),
-                    "stake": idea.stake,
-                    "why": idea.rationale,
-                })
+            edges += [_edge_dict(i, sport) for i in find_value_edges(quotes, preds, config)]
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{sport}: {exc}")
     edges.sort(key=lambda e: e["edge"], reverse=True)
-    return {"edges": edges, "errors": errors}
+    return {"edges": edges, "errors": errors, "live": False}
+
+
+@app.get("/api/live/status")
+def api_live_status() -> dict:
+    return {"connected": LIVE.connected, "markets": len(LIVE.markets),
+            "last_update": LIVE.last_update, "error": LIVE.error}
+
+
+@app.websocket("/ws")
+async def ws_edges(sock: WebSocket) -> None:
+    """Push recomputed edges to the browser ~1.5s while the live book is fed."""
+    await sock.accept()
+    config = _config(0.03, 0.25, 1000.0)
+    try:
+        while True:
+            if LIVE.connected and LIVE.markets:
+                edges = [_edge_dict(i, _sport_of(i.market_id)) for i in LIVE.edges(config)]
+                edges.sort(key=lambda e: e["edge"], reverse=True)
+                await sock.send_json({"edges": edges, "live": True,
+                                      "last_update": LIVE.last_update})
+            else:
+                await sock.send_json({"edges": [], "live": False, "error": LIVE.error})
+            await asyncio.sleep(1.5)
+    except WebSocketDisconnect:
+        return
 
 
 @app.get("/api/backtest")
