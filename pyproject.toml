@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kalshi-optimizer"
+version = "0.1.0"
+description = "Find and optimize profitable trades on Kalshi sports markets"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31",
+    "websockets>=12.0",
+    "cryptography>=42.0",   # RSA signing for Kalshi API auth
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "apscheduler>=3.10",
+    "rich>=13.7",           # nice CLI output
+]
+
+[project.optional-dependencies]
+dashboard = ["streamlit>=1.31"]
+dev = ["pytest>=8.0", "ruff>=0.3", "mypy>=1.9"]
+
+[project.scripts]
+kalshi-optimizer = "kalshi_optimizer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

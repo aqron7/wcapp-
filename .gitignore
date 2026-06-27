@@ -1,0 +1,28 @@
+# Secrets & config
+.env
+config.yaml
+*.pem
+kalshi_*.key
+
+# Local data / DB
+data/
+*.sqlite
+*.db
+*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

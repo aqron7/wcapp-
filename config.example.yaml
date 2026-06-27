@@ -1,0 +1,26 @@
+# Copy to config.yaml and adjust. Secrets live in .env, not here.
+
+sports:
+  - mlb
+  - soccer        # World Cup et al.
+
+bankroll: 1000.0          # USD, paper bankroll to start
+
+sizing:
+  kelly_fraction: 0.25    # quarter-Kelly; conservative
+  max_per_market: 50.0    # max USD exposure to a single market
+  max_total_exposure: 500.0
+
+edge:
+  min_edge: 0.03          # require >=3% EV gap (model_prob - price) after fees
+  kalshi_fee: 0.01        # approximate; refine from Kalshi fee schedule
+
+arbitrage:
+  min_profit: 0.01        # min guaranteed profit fraction to flag an arb
+
+execution:
+  mode: dry_run           # dry_run | paper | live  (live requires CLV gate passed)
+  kill_switch: true       # if true, blocks all order placement
+
+polling:
+  interval_seconds: 60
