@@ -82,7 +82,11 @@ _ALIASES = {"mlb": MLB_TEAMS, "soccer": SOCCER_TEAMS}
 
 
 def canonical_teams(text: str, sport: str) -> list[str]:
-    """Return canonical team tokens found in ``text`` (longest alias wins)."""
+    """Return canonical team tokens found in ``text``, ordered by appearance.
+
+    Order matters: for a title like "Will the Yankees beat the Red Sox?" the
+    first team is the subject of the "Yes" outcome.
+    """
     table = _ALIASES.get(sport, {})
     low = text.lower()
     found: dict[str, int] = {}
@@ -90,10 +94,15 @@ def canonical_teams(text: str, sport: str) -> list[str]:
         for alias in aliases:
             idx = low.find(alias)
             if idx >= 0:
-                # keep earliest position so we can order if needed later
                 found[token] = min(found.get(token, idx), idx)
                 break
-    return list(found.keys())
+    return sorted(found, key=lambda t: found[t])
+
+
+def subject_team(text: str, sport: str) -> str | None:
+    """The team the 'Yes' outcome refers to (first team named), or None."""
+    teams = canonical_teams(text, sport)
+    return teams[0] if teams else None
 
 
 def event_key(text: str, sport: str, game_date: date | None) -> str | None:

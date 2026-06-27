@@ -17,7 +17,9 @@ from .config import Config
 from .data.kalshi import KalshiClient
 from .data.polymarket import PolymarketClient
 from .engine.arbitrage import scan_cross_platform
-from .types import MarketQuote
+from .engine.value import find_value_edges, matchups_from_quotes
+from .models.baseball import BaseballModel
+from .types import MarketQuote, Prediction, TradeIdea
 
 console = Console()
 
@@ -77,9 +79,66 @@ def cmd_demo_arb(config: Config) -> None:
     console.print(table)
 
 
+def _render_ideas(ideas: list[TradeIdea], title: str) -> None:
+    if not ideas:
+        console.print("[dim]No value edges above threshold.[/dim]")
+        return
+    table = Table(title=title)
+    for col in ("Market", "Side", "Price", "Fair", "Edge %", "Stake $"):
+        table.add_column(col, justify="right" if col not in ("Market", "Side") else "left")
+    for i in ideas:
+        table.add_row(
+            i.title[:48],
+            i.side.value,
+            f"{i.price:.2f}",
+            f"{i.fair_prob:.2f}",
+            f"{i.edge * 100:.1f}",
+            f"{i.stake:.2f}",
+        )
+    console.print(table)
+
+
+def _mlb_predictions(model: BaseballModel, quotes: list[MarketQuote]) -> list[Prediction]:
+    preds: list[Prediction] = []
+    for event_key, home, away in matchups_from_quotes(quotes, "mlb"):
+        preds.extend(model.predict_matchup(event_key, home, away))
+    return preds
+
+
 def cmd_find_edges(config: Config) -> None:
-    console.print("[bold]Find value edges[/bold] (phase 2+) — not yet implemented.")
-    # TODO(phase2): run models -> fair_value.blend -> edge.best_side -> sizing.stake, rank.
+    """Live: model probabilities vs Kalshi prices -> ranked value bets."""
+    kalshi = KalshiClient(config.secrets)
+    model = BaseballModel()
+    # TODO(phase2): model.fit(load_historical_games()) — flat ratings until then.
+
+    quotes: list[MarketQuote] = []
+    for sport in config.sports:
+        if sport != "mlb":
+            continue  # only the MLB model exists so far (soccer is phase 4)
+        try:
+            quotes.extend(kalshi.get_sports_markets("mlb"))
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"  [yellow]kalshi/mlb fetch failed:[/yellow] {exc}")
+
+    ideas = find_value_edges(quotes, _mlb_predictions(model, quotes), config)
+    _render_ideas(ideas, "MLB value edges (model vs Kalshi)")
+
+
+def cmd_demo_edges(config: Config) -> None:
+    """Offline: run the value engine on bundled fixtures with seeded ratings."""
+    import json
+    from pathlib import Path
+
+    from .data import kalshi as kalshi_data
+
+    fix = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
+    quotes = kalshi_data.parse_markets(json.loads((fix / "kalshi_markets.json").read_text()), "mlb")
+
+    model = BaseballModel()
+    model.elo.ratings.update({"NYY": 1600, "BOS": 1450, "LAD": 1550, "SF": 1500})
+
+    ideas = find_value_edges(quotes, _mlb_predictions(model, quotes), config)
+    _render_ideas(ideas, "MLB value edges (demo fixtures)")
 
 
 def cmd_backtest(config: Config) -> None:
@@ -94,6 +153,7 @@ def main() -> None:
     sub.add_parser("scan-arb", help="cross-platform arbitrage scan (phase 1)")
     sub.add_parser("demo-arb", help="run arb scanner on bundled fixtures (no network)")
     sub.add_parser("find-edges", help="ranked model-vs-Kalshi value bets (phase 2+)")
+    sub.add_parser("demo-edges", help="run value engine on bundled fixtures (no network)")
     sub.add_parser("backtest", help="validation gate report (phase 3)")
 
     args = parser.parse_args()
@@ -103,6 +163,7 @@ def main() -> None:
         "scan-arb": cmd_scan_arb,
         "demo-arb": cmd_demo_arb,
         "find-edges": cmd_find_edges,
+        "demo-edges": cmd_demo_edges,
         "backtest": cmd_backtest,
     }[args.command](config)
 

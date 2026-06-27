@@ -24,11 +24,13 @@ cp config.example.yaml config.yaml
 
 python -m kalshi_optimizer --help
 
-# See the arb scanner work end-to-end on bundled fixtures (no keys/network):
-python -m kalshi_optimizer demo-arb
+# See the pipeline work end-to-end on bundled fixtures (no keys/network):
+python -m kalshi_optimizer demo-arb      # cross-platform arbitrage
+python -m kalshi_optimizer demo-edges    # model-vs-Kalshi value bets
 
-# Live cross-platform arbitrage scan (needs Kalshi key + open network):
-python -m kalshi_optimizer --config config.yaml scan-arb
+# Live (needs Kalshi key + open network):
+python -m kalshi_optimizer --config config.yaml scan-arb     # arbitrage
+python -m kalshi_optimizer --config config.yaml find-edges   # MLB value bets
 ```
 
 > Note: `scan-arb` reaches Kalshi (`api.elections.kalshi.com`) and Polymarket
