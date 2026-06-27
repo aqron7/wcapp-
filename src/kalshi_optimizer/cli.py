@@ -74,17 +74,22 @@ def cmd_sample(config: Config, sport: str) -> None:
     """
     kalshi = KalshiClient(config.secrets)
     quotes = kalshi.get_sports_markets(sport)
-    table = Table(title=f"Kalshi {sport} markets (showing up to 30 of {len(quotes)})")
+    liquid = [q for q in quotes if q.yes_bid or q.yes_ask]
+    # Show liquid (tradeable) markets first.
+    quotes.sort(key=lambda q: 0 if (q.yes_bid or q.yes_ask) else 1)
+
+    console.print(f"[bold]{len(liquid)} of {len(quotes)} {sport} markets have live prices.[/bold]")
+    table = Table(title=f"Kalshi {sport} markets (first 30, liquid shown first)")
     table.add_column("title")
+    table.add_column("outcome")
     table.add_column("yes_bid", justify="right")
     table.add_column("yes_ask", justify="right")
-    table.add_column("event_key")
     for q in quotes[:30]:
         table.add_row(
-            q.title[:55],
+            q.title[:42],
+            q.outcome_label or q.outcome or "?",
             "-" if q.yes_bid is None else f"{q.yes_bid:.2f}",
             "-" if q.yes_ask is None else f"{q.yes_ask:.2f}",
-            q.event_key or "[dim]none[/dim]",
         )
     console.print(table)
 
