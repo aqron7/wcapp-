@@ -80,7 +80,10 @@ def parse_markets(payload: dict, sport: str) -> list[MarketQuote]:
 
 class KalshiClient:
     def __init__(self, secrets: Secrets):
+        from urllib.parse import urlparse
+
         self.base = secrets.kalshi_api_base.rstrip("/")
+        self.base_path = urlparse(self.base).path.rstrip("/")  # e.g. /trade-api/v2
         self.key_id = secrets.kalshi_api_key_id
         self._private_key = self._load_key(secrets.kalshi_private_key_path)
         self._session = requests.Session()
@@ -91,15 +94,14 @@ class KalshiClient:
             return None
         return serialization.load_pem_private_key(Path(path).read_bytes(), password=None)
 
-    def _headers(self, method: str, route: str) -> dict[str, str]:
-        """Build signed auth headers.
-
-        Kalshi signs the string: ``timestamp_ms + METHOD + route_path``.
-        """
+    def _sign(self, method: str, full_path: str) -> dict[str, str]:
+        """Sign ``timestamp_ms + METHOD + full_path`` (full_path includes
+        /trade-api/v2). Kalshi validates against the full request path, so this
+        must be the absolute path — not just the route."""
         if self._private_key is None:
             raise RuntimeError("Kalshi private key not loaded; set KALSHI_PRIVATE_KEY_PATH")
         ts = str(int(time.time() * 1000))
-        msg = f"{ts}{method.upper()}{route}".encode()
+        msg = f"{ts}{method.upper()}{full_path}".encode()
         signature = self._private_key.sign(
             msg,
             padding.PSS(
@@ -114,11 +116,18 @@ class KalshiClient:
             "KALSHI-ACCESS-TIMESTAMP": ts,
         }
 
+    def _headers(self, method: str, route: str) -> dict[str, str]:
+        return self._sign(method, self.base_path + route)
+
     def _get(self, route: str, params: dict | None = None) -> dict:
         url = f"{self.base}{route}"
         resp = self._session.get(url, headers=self._headers("GET", route), params=params, timeout=15)
         resp.raise_for_status()
         return resp.json()
+
+    def auth_check(self) -> dict:
+        """Hit an authenticated endpoint to verify RSA signing actually works."""
+        return self._get("/portfolio/balance")
 
     # ------------------------------------------------------------------ #
     # Phase 0: market data
@@ -159,7 +168,7 @@ class KalshiClient:
 
         host = urlparse(self.base).netloc
         url = f"wss://{host}{self.WS_PATH}"
-        return url, self._headers("GET", self.WS_PATH)
+        return url, self._sign("GET", self.WS_PATH)
 
     def iter_raw_markets(self, sport: str, status: str | None = None):
         """Yield raw market dicts for a sport, paging all series (for logging

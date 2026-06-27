@@ -233,6 +233,21 @@ def cmd_demo_edges(config: Config) -> None:
     _render_ideas(ideas, "MLB value edges (demo fixtures)")
 
 
+def cmd_auth_check(config: Config) -> None:
+    """Verify RSA signing against an authenticated Kalshi endpoint."""
+    kalshi = KalshiClient(config.secrets)
+    console.print(f"base: [bold]{kalshi.base}[/bold]")
+    console.print(f"key id set: {bool(kalshi.key_id)} · private key loaded: {kalshi._private_key is not None}")
+    try:
+        bal = kalshi.auth_check()
+        console.print(f"[green]AUTH OK[/green] — balance endpoint returned: {bal}")
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]AUTH FAILED[/red] — {exc}")
+        console.print("If 401: key/base environment mismatch (demo key vs prod base) "
+                      "or wrong signing. Production base is "
+                      "https://api.elections.kalshi.com/trade-api/v2")
+
+
 def cmd_dashboard(config: Config) -> None:
     """Launch the web dashboard (FastAPI + custom frontend)."""
     try:
@@ -287,6 +302,7 @@ def main() -> None:
     sub.add_parser("demo-arb", help="run arb scanner on bundled fixtures (no network)")
     sub.add_parser("find-edges", help="ranked model-vs-Kalshi value bets (phase 2+)")
     sub.add_parser("demo-edges", help="run value engine on bundled fixtures (no network)")
+    sub.add_parser("auth-check", help="verify Kalshi API auth on a private endpoint")
     sub.add_parser("dashboard", help="launch the web dashboard (phase 5)")
     sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
     sub.add_parser("backtest", help="validation gate report (phase 3)")
@@ -315,6 +331,7 @@ def main() -> None:
         "demo-arb": cmd_demo_arb,
         "find-edges": cmd_find_edges,
         "demo-edges": cmd_demo_edges,
+        "auth-check": cmd_auth_check,
         "dashboard": cmd_dashboard,
         "snapshot": cmd_snapshot,
         "backtest": cmd_backtest,
