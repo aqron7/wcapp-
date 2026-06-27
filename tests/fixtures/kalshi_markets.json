@@ -1,35 +1,62 @@
 {
   "markets": [
     {
-      "ticker": "KXMLBGAME-26JUN27NYYBOS-NYY",
-      "event_ticker": "KXMLBGAME-26JUN27NYYBOS",
-      "title": "Will the New York Yankees beat the Boston Red Sox?",
+      "ticker": "KXMLBGAME-26JUN271905NYYBOS-NYY",
+      "event_ticker": "KXMLBGAME-26JUN271905NYYBOS",
+      "title": "New York Y vs Boston Winner?",
       "status": "active",
-      "yes_bid": 54,
-      "yes_ask": 56,
-      "no_bid": 44,
-      "no_ask": 46,
-      "close_time": "2026-06-27T23:05:00Z"
+      "market_type": "binary",
+      "yes_bid_dollars": "0.5400",
+      "yes_ask_dollars": "0.5600",
+      "no_bid_dollars": "0.4400",
+      "no_ask_dollars": "0.4600",
+      "yes_sub_title": "New York Y"
     },
     {
-      "ticker": "KXMLBGAME-26JUN27LADSF-LAD",
-      "event_ticker": "KXMLBGAME-26JUN27LADSF",
-      "title": "Will the Los Angeles Dodgers beat the San Francisco Giants?",
+      "ticker": "KXMLBGAME-26JUN271905NYYBOS-BOS",
+      "event_ticker": "KXMLBGAME-26JUN271905NYYBOS",
+      "title": "New York Y vs Boston Winner?",
       "status": "active",
-      "yes_bid": 61,
-      "yes_ask": 63,
-      "no_bid": 37,
-      "no_ask": 39,
-      "close_time": "2026-06-27T22:10:00Z"
+      "market_type": "binary",
+      "yes_bid_dollars": "0.4400",
+      "yes_ask_dollars": "0.4600",
+      "no_bid_dollars": "0.5400",
+      "no_ask_dollars": "0.5600",
+      "yes_sub_title": "Boston"
     },
     {
-      "ticker": "KXMLBGAME-26JUN26OLD-XYZ",
-      "event_ticker": "KXMLBGAME-26JUN26OLD",
-      "title": "Will the Chicago Cubs beat the Cincinnati Reds?",
+      "ticker": "KXMLBGAME-26JUN272210LADSF-LAD",
+      "event_ticker": "KXMLBGAME-26JUN272210LADSF",
+      "title": "Los Angeles D vs San Francisco Winner?",
+      "status": "active",
+      "market_type": "binary",
+      "yes_bid_dollars": "0.5300",
+      "yes_ask_dollars": "0.5500",
+      "no_bid_dollars": "0.4500",
+      "no_ask_dollars": "0.4700",
+      "yes_sub_title": "Los Angeles D"
+    },
+    {
+      "ticker": "KXMLBGAME-26JUN272210LADSF-SF",
+      "event_ticker": "KXMLBGAME-26JUN272210LADSF",
+      "title": "Los Angeles D vs San Francisco Winner?",
+      "status": "active",
+      "market_type": "binary",
+      "yes_bid_dollars": "0.4500",
+      "yes_ask_dollars": "0.4700",
+      "no_bid_dollars": "0.5300",
+      "no_ask_dollars": "0.5500",
+      "yes_sub_title": "San Francisco"
+    },
+    {
+      "ticker": "KXMLBGAME-26JUN260000OLDGAME-XYZ",
+      "event_ticker": "KXMLBGAME-26JUN260000OLDGAME",
+      "title": "Old Settled Game Winner?",
       "status": "settled",
-      "yes_bid": 100,
-      "yes_ask": 100,
-      "close_time": "2026-06-26T22:10:00Z"
+      "market_type": "binary",
+      "yes_bid_dollars": "1.0000",
+      "yes_ask_dollars": "1.0000",
+      "yes_sub_title": "Whoever"
     }
   ],
   "cursor": ""

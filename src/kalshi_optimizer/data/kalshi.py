@@ -23,7 +23,6 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
 from ..config import Secrets
-from ..normalize import event_key, parse_iso_date
 from ..types import MarketQuote
 
 # Kalshi sports markets live under series tickers. These are sensible defaults;
@@ -37,37 +36,43 @@ SPORT_SERIES: dict[str, list[str]] = {
 }
 
 
-def _cents_to_prob(cents: int | float | None) -> float | None:
-    """Kalshi prices are integer cents (1..99). Convert to probability [0,1]."""
-    if cents is None:
+def _price(raw) -> float | None:
+    """Kalshi returns prices as decimal-dollar strings ("0.5600"); 0/empty = no
+    resting order, so treat those as None (no liquidity)."""
+    if raw in (None, ""):
         return None
-    return float(cents) / 100.0
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return val if val > 0 else None
 
 
 def parse_markets(payload: dict, sport: str) -> list[MarketQuote]:
     """Parse a GET /markets response body into MarketQuotes.
 
-    Pure function — no network. ``payload`` is the decoded JSON dict with a
-    ``markets`` list. Closed/settled markets and those without an identifiable
-    event are skipped.
+    Pure function — no network. Each game has several binary markets (one per
+    outcome) sharing an ``event_ticker``; the per-outcome code is the suffix of
+    the market ``ticker`` (e.g. ``...AUSEGY-AUS`` -> "AUS", ``-TIE`` = draw).
     """
     quotes: list[MarketQuote] = []
     for m in payload.get("markets", []):
         if m.get("status") not in (None, "active", "open"):
             continue
-        title = m.get("title") or m.get("subtitle") or m.get("ticker", "")
-        close_time = m.get("close_time")
-        gday = parse_iso_date(close_time)
+        ticker = m.get("ticker", "")
+        event_ticker = m.get("event_ticker")
+        outcome = ticker.rsplit("-", 1)[-1] if "-" in ticker else None
         quotes.append(
             MarketQuote(
                 platform="kalshi",
-                market_id=m.get("ticker", ""),
-                title=title,
-                yes_bid=_cents_to_prob(m.get("yes_bid")),
-                yes_ask=_cents_to_prob(m.get("yes_ask")),
+                market_id=ticker,
+                title=m.get("title", ""),
+                yes_bid=_price(m.get("yes_bid_dollars")),
+                yes_ask=_price(m.get("yes_ask_dollars")),
                 sport=sport,
-                event_key=event_key(title, sport, gday),
-                close_time=None,
+                event_key=event_ticker,
+                outcome=outcome,
+                outcome_label=m.get("yes_sub_title"),
             )
         )
     return quotes

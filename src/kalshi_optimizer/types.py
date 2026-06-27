@@ -25,7 +25,9 @@ class MarketQuote:
     yes_bid: float | None
     yes_ask: float | None
     sport: str | None = None
-    event_key: str | None = None   # normalized key to match the SAME event across platforms
+    event_key: str | None = None   # groups markets of the same game (Kalshi: event_ticker)
+    outcome: str | None = None     # outcome code, e.g. "SEA", "AUS", "TIE"
+    outcome_label: str | None = None   # human label, e.g. "Seattle", "Reg Time: Tie"
     close_time: datetime | None = None
 
     @property

@@ -28,25 +28,25 @@ def test_evaluate_market_prefers_no_when_overpriced():
     side, entry, edge = evaluate_market(fair_prob=0.30, yes_bid=0.54, yes_ask=0.56, fee=0.0)
     assert side is Side.NO
     assert entry == 0.46  # 1 - yes_bid
-    assert round(edge, 2) == 0.24  # 0.54 - 0.30
+    assert round(edge, 2) == 0.24
 
 
 def test_elo_fit_moves_ratings_toward_winner():
     model = BaseballModel()
-    games = [GameResult("NYY", "BOS", home_won=True)] * 10
-    model.fit(games)
+    model.fit([GameResult("NYY", "BOS", home_won=True)] * 10)
     assert model.elo.rating("NYY") > model.elo.rating("BOS")
 
 
-def test_matchups_dedup_and_subject_is_home():
+def test_matchups_use_event_ticker_and_title_order():
     matchups = matchups_from_quotes(_quotes(), "mlb")
     keys = [m[0] for m in matchups]
     assert len(keys) == len(set(keys))  # unique events
-    nyy = next(m for m in matchups if "NYY" in m)
-    assert nyy[1] == "NYY"  # subject (Yankees) treated as home
+    nyybos = next(m for m in matchups if m[0].endswith("NYYBOS"))
+    # title "New York Y vs Boston" -> away NYY, home BOS
+    assert nyybos == ("KXMLBGAME-26JUN271905NYYBOS", "BOS", "NYY")
 
 
-def test_find_value_edges_ranks_and_sizes():
+def test_find_value_edges_ranks_dedups_and_sizes():
     quotes = _quotes()
     model = BaseballModel()
     model.elo.ratings.update({"NYY": 1600, "BOS": 1450, "LAD": 1550, "SF": 1500})
@@ -54,14 +54,14 @@ def test_find_value_edges_ranks_and_sizes():
     for ek, home, away in matchups_from_quotes(quotes, "mlb"):
         preds += model.predict_matchup(ek, home, away)
 
-    config = Config()  # defaults: min_edge 0.03, fee 0.01, quarter-Kelly
+    config = Config()  # min_edge 0.03, fee 0.01, quarter-Kelly
     ideas = find_value_edges(quotes, preds, config)
 
-    # Yankees are a strong +EV YES at 0.56; Dodgers game is roughly fair -> no bet.
+    # Yankees strongly underpriced -> one idea (deduped to one bet per game);
+    # the Dodgers/Giants game is ~fair -> no bet.
     assert len(ideas) == 1
     idea = ideas[0]
-    assert "Yankees" in idea.title
+    assert "New York Y" in idea.title
     assert idea.side is Side.YES
     assert idea.edge > 0.03
-    assert idea.stake > 0
-    assert idea.stake <= config.sizing.max_per_market
+    assert 0 < idea.stake <= config.sizing.max_per_market

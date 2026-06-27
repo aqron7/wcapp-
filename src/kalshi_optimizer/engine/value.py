@@ -12,7 +12,6 @@ unit-tested offline.
 from __future__ import annotations
 
 from ..config import Config
-from ..normalize import canonical_teams, subject_team
 from ..types import MarketQuote, Prediction, Side, TradeIdea
 from .edge import evaluate_market
 from .fair_value import blend
@@ -22,21 +21,37 @@ from .sizing import stake
 def matchups_from_quotes(
     quotes: list[MarketQuote], sport: str
 ) -> list[tuple[str, str, str]]:
-    """Derive unique (event_key, home, away) matchups from market titles.
+    """Derive unique (event_ticker, home, away) matchups from Kalshi markets.
 
-    NOTE: titles don't state home/away, so the subject team is treated as home.
-    TODO(phase2): join a schedule feed for correct home/away assignment.
+    Teams are the non-draw outcome codes sharing an ``event_ticker``. Home/away
+    is inferred from the title ("away vs home"): the team whose label appears
+    later in the title is treated as home.
+
+    TODO: confirm home/away against a schedule feed; title order is a heuristic.
     """
-    seen: set[str] = set()
-    out: list[tuple[str, str, str]] = []
+    events: dict[str, dict] = {}
     for q in quotes:
-        if q.event_key is None or q.sport != sport or q.event_key in seen:
+        if q.platform != "kalshi" or not q.event_key or q.sport != sport:
             continue
-        teams = canonical_teams(q.title, sport)
-        if len(teams) < 2:
+        info = events.setdefault(q.event_key, {"title": q.title or "", "teams": {}})
+        if q.outcome and q.outcome != "TIE":
+            info["teams"][q.outcome] = q.outcome_label or ""
+
+    out: list[tuple[str, str, str]] = []
+    for event_ticker, info in events.items():
+        teams = list(info["teams"].items())  # [(code, label), ...]
+        if len(teams) != 2:
             continue
-        seen.add(q.event_key)
-        out.append((q.event_key, teams[0], teams[1]))
+        title = info["title"].lower()
+
+        def title_pos(label: str) -> int:
+            name = label.split(":")[-1].strip().lower()
+            idx = title.find(name) if name else -1
+            return idx if idx >= 0 else 9999
+
+        teams.sort(key=lambda t: title_pos(t[1]))
+        away, home = teams[0][0], teams[1][0]
+        out.append((event_ticker, home, away))
     return out
 
 
@@ -55,41 +70,31 @@ def find_value_edges(
     pred_index = {(p.event_key, p.outcome): p.fair_prob for p in predictions}
     market_probs = market_probs or {}
 
-    ideas: list[TradeIdea] = []
-    running_exposure = 0.0
+    candidates: list[TradeIdea] = []
     for q in quotes:
-        if q.platform != "kalshi" or q.event_key is None:
+        if q.platform != "kalshi" or not q.event_key or not q.outcome:
             continue
-        if q.yes_bid is None or q.yes_ask is None or not q.sport:
+        if not q.yes_bid or not q.yes_ask:  # 0 / None => no liquidity
             continue
-        subj = subject_team(q.title, q.sport)
-        if subj is None:
-            continue
-        model_p = pred_index.get((q.event_key, subj))
+        model_p = pred_index.get((q.event_key, q.outcome))
         if model_p is None:
             continue
 
-        fair = blend(model_p, market_probs.get((q.event_key, subj)), model_weight)
+        fair = blend(model_p, market_probs.get((q.event_key, q.outcome)), model_weight)
         side, entry, edge = evaluate_market(fair, q.yes_bid, q.yes_ask, config.edge.kalshi_fee)
         if edge < config.edge.min_edge:
             continue
 
-        win_prob = fair if side is Side.YES else 1.0 - fair
-        sized = stake(win_prob, entry, config.bankroll, config.sizing, running_exposure)
-        if sized <= 0:
-            continue
-        running_exposure += sized
-
-        ideas.append(
+        candidates.append(
             TradeIdea(
                 market_id=q.market_id,
                 platform="kalshi",
-                title=q.title,
+                title=f"{q.title} [{q.outcome_label or q.outcome}]",
                 side=side,
                 price=entry,
                 fair_prob=round(fair, 4),
                 edge=round(edge, 4),
-                stake=sized,
+                stake=0.0,  # filled after dedup + sizing
                 kind="value",
                 rationale=(
                     f"model {model_p:.0%} -> fair {fair:.0%} vs "
@@ -98,5 +103,21 @@ def find_value_edges(
             )
         )
 
-    ideas.sort(key=lambda i: i.edge, reverse=True)
+    # One bet per game (buying YES on one outcome == NO on the other), best edge.
+    candidates.sort(key=lambda i: i.edge, reverse=True)
+    seen_events: set[str] = set()
+    ideas: list[TradeIdea] = []
+    running_exposure = 0.0
+    for idea in candidates:
+        event = idea.market_id.rsplit("-", 1)[0]
+        if event in seen_events:
+            continue
+        seen_events.add(event)
+        win_prob = idea.fair_prob if idea.side is Side.YES else 1.0 - idea.fair_prob
+        sized = stake(win_prob, idea.price, config.bankroll, config.sizing, running_exposure)
+        if sized <= 0:
+            continue
+        running_exposure += sized
+        idea.stake = sized
+        ideas.append(idea)
     return ideas
