@@ -28,7 +28,11 @@ def predictions_with_context(sport: str, quotes: list[MarketQuote]) -> list[Pred
     from ..models.context import load_venues
 
     conn = storage.connect()
-    return predictions_for_sport(sport, quotes, recent_form(conn, sport), load_venues())
+    preds = predictions_for_sport(sport, quotes, recent_form(conn, sport), load_venues())
+    if sport == "mlb":
+        from ..models.props import strikeout_predictions_live
+        preds += strikeout_predictions_live(quotes)  # KXMLBKS via MLB StatsAPI
+    return preds
 
 
 def _form_delta(form: dict | None, code: str) -> float:

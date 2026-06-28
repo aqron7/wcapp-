@@ -69,7 +69,13 @@ def parse_markets(payload: dict, sport: str, market_type: str = "winner") -> lis
             continue
         ticker = m.get("ticker", "")
         event_ticker = m.get("event_ticker")
-        outcome = ticker.rsplit("-", 1)[-1] if "-" in ticker else None
+        # Outcome = ticker minus the event prefix. For winner/total/spread that's
+        # a single segment (NYY, 3, ESP2); for player props it keeps the pitcher
+        # segment too (TBDRASMUSSEN57-10), so two players in a game don't collide.
+        if event_ticker and ticker.startswith(event_ticker + "-"):
+            outcome = ticker[len(event_ticker) + 1:]
+        else:
+            outcome = ticker.rsplit("-", 1)[-1] if "-" in ticker else None
         strike = m.get("floor_strike")
         if strike is None:
             strike = m.get("cap_strike")
