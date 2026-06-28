@@ -70,6 +70,9 @@ def prob_btts(matrix: list[list[float]]) -> float:
     return sum(p for i, row in enumerate(matrix) for j, p in enumerate(row) if i >= 1 and j >= 1)
 
 
-def prob_margin_over(matrix: list[list[float]], line: float) -> float:
-    """P(home margin > line); use negative lines for away handicaps."""
+def prob_margin_over(matrix: list[list[float]], line: float, away: bool = False) -> float:
+    """P(team wins by more than ``line``). Home (team A, rows) by default; set
+    away=True for team B (cols)."""
+    if away:
+        return sum(p for i, row in enumerate(matrix) for j, p in enumerate(row) if (j - i) > line)
     return sum(p for i, row in enumerate(matrix) for j, p in enumerate(row) if (i - j) > line)

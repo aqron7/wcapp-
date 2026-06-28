@@ -11,6 +11,8 @@ unit-tested offline.
 
 from __future__ import annotations
 
+import re
+
 from ..config import Config
 from ..models.soccer import SoccerModel
 from ..types import MarketQuote, Prediction, Side, TradeIdea
@@ -64,12 +66,72 @@ def predictions_for_sport(sport: str, quotes: list[MarketQuote],
         preds += soccer_totals_predictions(quotes, model)  # Dixon-Coles scoreline
     else:
         return []
+    preds += spread_predictions(quotes, sport)  # handicap / run-line markets
     return preds
 
 
 def _game_key(event_ticker: str) -> str:
     """Date+teams part shared across a game's market series (KXWCGAME / KXWCTOTAL)."""
     return event_ticker.split("-", 1)[1] if "-" in event_ticker else event_ticker
+
+
+def _winner_teams_by_game(quotes: list[MarketQuote], sport: str) -> dict[str, dict[str, str]]:
+    """{game_key: {outcome_code: country/label}} from a sport's winner markets."""
+    teams: dict[str, dict[str, str]] = {}
+    for q in quotes:
+        if (q.sport == sport and q.market_type == "winner" and q.event_key
+                and q.outcome and q.outcome != "TIE"):
+            teams.setdefault(_game_key(q.event_key), {})[q.outcome] = _clean_label(q.outcome_label)
+    return teams
+
+
+_SPREAD_TEAM_RE = re.compile(r"^([A-Za-z]+)\d+$")
+
+
+def spread_predictions(quotes: list[MarketQuote], sport: str) -> list[Prediction]:
+    """Spread (handicap) predictions: P(team wins by more than the line).
+
+    Soccer uses the Dixon-Coles matrix; MLB uses a two-Poisson run matrix. The
+    spread outcome code is team+number (e.g. ESP2, STL4); the line is floor_strike.
+    """
+    from ..models import dixon_coles as dc
+
+    game_teams = _winner_teams_by_game(quotes, sport)
+    if sport == "soccer":
+        model = SoccerModel()
+    elif sport == "mlb":
+        from ..models.baseball import BaseballModel
+        bm = BaseballModel()
+    else:
+        return []
+
+    matrices: dict[str, list] = {}
+    preds: list[Prediction] = []
+    for q in quotes:
+        if q.market_type != "spread" or q.sport != sport or q.strike is None or not q.outcome:
+            continue
+        gk = _game_key(q.event_key)
+        teams = list(game_teams.get(gk, {}).items())  # [(code, label), ...]
+        if len(teams) != 2:
+            continue
+        (code_a, label_a), (code_b, label_b) = teams
+        if gk not in matrices:
+            if sport == "soccer":
+                matrices[gk] = model.score_matrix(label_a, label_b)
+            else:
+                la, lb = dc.lambdas_from_elo(bm.elo.rating(code_a), bm.elo.rating(code_b),
+                                             avg_total=8.6)
+                matrices[gk] = dc.score_matrix(la, lb, rho=0.0, max_goals=18)
+        m = _SPREAD_TEAM_RE.match(q.outcome)
+        team = m.group(1) if m else None
+        if team == code_a:
+            p = dc.prob_margin_over(matrices[gk], q.strike)
+        elif team == code_b:
+            p = dc.prob_margin_over(matrices[gk], q.strike, away=True)
+        else:
+            continue
+        preds.append(Prediction(q.event_key, q.outcome, p, sport, "spread_v1"))
+    return preds
 
 
 def soccer_totals_predictions(quotes: list[MarketQuote], model: SoccerModel) -> list[Prediction]:
