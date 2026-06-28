@@ -55,14 +55,18 @@ def cmd_scan_arb(config: Config) -> None:
     console.print(table)
 
 
-def cmd_raw(config: Config, sport: str) -> None:
-    """Dump raw JSON for a few Kalshi markets so we can see real field names."""
+def cmd_raw(config: Config, sport: str, series: str | None = None) -> None:
+    """Dump raw JSON for a few Kalshi markets so we can see real field names.
+
+    Optionally pass a specific series ticker, e.g.:
+        python -m kalshi_optimizer raw soccer KXWCTOTAL
+    """
     import json
 
     from .data.kalshi import SPORT_SERIES
 
     kalshi = KalshiClient(config.secrets)
-    series = SPORT_SERIES.get(sport, [None])[0]
+    series = series or SPORT_SERIES.get(sport, [None])[0]
     payload = kalshi._get("/markets", params={"series_ticker": series, "limit": 4})
     console.print_json(json.dumps(payload.get("markets", [])))
 
@@ -307,6 +311,7 @@ def main() -> None:
     p_sample.add_argument("sport", help="sport key, e.g. mlb or soccer")
     p_raw = sub.add_parser("raw", help="dump raw JSON of a few Kalshi markets")
     p_raw.add_argument("sport", help="sport key, e.g. mlb or soccer")
+    p_raw.add_argument("series", nargs="?", default=None, help="optional series ticker, e.g. KXWCTOTAL")
 
     args = parser.parse_args()
     config = Config.load(args.config)
@@ -318,7 +323,7 @@ def main() -> None:
         cmd_sample(config, args.sport)
         return
     if args.command == "raw":
-        cmd_raw(config, args.sport)
+        cmd_raw(config, args.sport, args.series)
         return
 
     {
