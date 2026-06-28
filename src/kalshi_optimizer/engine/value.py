@@ -30,8 +30,8 @@ def predictions_with_context(sport: str, quotes: list[MarketQuote]) -> list[Pred
     conn = storage.connect()
     preds = predictions_for_sport(sport, quotes, recent_form(conn, sport), load_venues())
     if sport == "mlb":
-        from ..models.props import strikeout_predictions_live
-        preds += strikeout_predictions_live(quotes)  # KXMLBKS via MLB StatsAPI
+        from ..models.props import prop_predictions_live
+        preds += prop_predictions_live(quotes)  # K / HR / hits via MLB StatsAPI
     return preds
 
 

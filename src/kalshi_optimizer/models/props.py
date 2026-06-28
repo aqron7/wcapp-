@@ -27,23 +27,30 @@ def prob_over(lmbda: float, line: float) -> float:
     return max(0.0, min(1.0, 1.0 - cdf))
 
 
-def strikeout_predictions(quotes, pitcher_lambdas: dict[str, float]):
-    """Predictions for KXMLBKS markets given {pitcher_name_lower: K lambda}.
-
-    Pure: the pitcher is read from the market label ("Drew Rasmussen: 10+").
-    """
+def _prop_predictions(quotes, prefix: str, lambdas: dict[str, float], model_name: str):
+    """Generic player-prop predictions: market label "Name: N+" -> P(over line)."""
     from ..types import Prediction
 
     preds = []
     for q in quotes:
-        if not (q.market_id or "").startswith("KXMLBKS") or q.strike is None or not q.outcome:
+        if not (q.market_id or "").startswith(prefix) or q.strike is None or not q.outcome:
             continue
         name = (q.outcome_label or "").split(":", 1)[0].strip().lower()
-        lam = pitcher_lambdas.get(name)
+        lam = lambdas.get(name)
         if lam is None:
             continue
-        preds.append(Prediction(q.event_key, q.outcome, prob_over(lam, q.strike), "mlb", "k_prop_v1"))
+        preds.append(Prediction(q.event_key, q.outcome, prob_over(lam, q.strike), "mlb", model_name))
     return preds
+
+
+def strikeout_predictions(quotes, pitcher_lambdas: dict[str, float]):
+    """Predictions for KXMLBKS markets given {pitcher_name_lower: K lambda}."""
+    return _prop_predictions(quotes, "KXMLBKS", pitcher_lambdas, "k_prop_v1")
+
+
+def _names_for_prefix(quotes, prefix: str) -> set[str]:
+    return {(q.outcome_label or "").split(":", 1)[0].strip().lower()
+            for q in quotes if (q.market_id or "").startswith(prefix) and q.outcome_label}
 
 
 _MONTHS = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
@@ -79,17 +86,46 @@ def build_pitcher_lambdas(client, dates) -> dict[str, float]:
     return out
 
 
-def strikeout_predictions_live(quotes):
-    """Wire KXMLBKS markets to live StatsAPI projections (best-effort)."""
-    dates = _dates_in_quotes(quotes)
-    if not dates:
-        return []
+def build_batter_lambdas(client, names: set[str], stat: str, season: int = 2026) -> dict[str, float]:
+    """{name_lower: per-game rate} for the needed batters' season ``stat``."""
+    if not names:
+        return {}
+    ids = client.all_players(season)
+    out: dict[str, float] = {}
+    for name in names:
+        pid = ids.get(name)
+        if not pid:
+            continue
+        s = client.batter_season(pid)
+        if s and s.get("games", 0) > 0 and s.get(stat, 0) > 0:
+            out[name] = max(0.01, s[stat] / s["games"])
+    return out
+
+
+def prop_predictions_live(quotes):
+    """Wire all MLB player props (K / HR / hits) to live StatsAPI projections.
+
+    Best-effort and fully guarded — a feed hiccup never breaks edge calc.
+    """
     from ..data.mlb_stats import MlbStatsClient
+
+    preds = []
     try:
-        lambdas = build_pitcher_lambdas(MlbStatsClient(), dates)
-    except Exception:  # noqa: BLE001 - feed optional; never break edge calc
-        return []
-    return strikeout_predictions(quotes, lambdas)
+        client = MlbStatsClient()
+        dates = _dates_in_quotes(quotes)
+        if dates:
+            preds += strikeout_predictions(quotes, build_pitcher_lambdas(client, dates))
+        hr_names = _names_for_prefix(quotes, "KXMLBHR")
+        if hr_names:
+            preds += _prop_predictions(quotes, "KXMLBHR",
+                                       build_batter_lambdas(client, hr_names, "hr"), "hr_prop_v1")
+        hit_names = _names_for_prefix(quotes, "KXMLBHIT")
+        if hit_names:
+            preds += _prop_predictions(quotes, "KXMLBHIT",
+                                       build_batter_lambdas(client, hit_names, "hits"), "hits_prop_v1")
+    except Exception:  # noqa: BLE001
+        pass
+    return preds
 
 
 def expected_innings(season: dict, default: float = DEFAULT_START_INNINGS) -> float:

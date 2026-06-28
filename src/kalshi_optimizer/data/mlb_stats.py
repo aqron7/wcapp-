@@ -35,6 +35,28 @@ def parse_probables(payload: dict) -> list[dict]:
     return out
 
 
+def parse_players(payload: dict) -> dict[str, int]:
+    """name(lower) -> player id from a /sports/1/players response."""
+    return {p["fullName"].lower(): p["id"]
+            for p in payload.get("people", []) if p.get("fullName") and p.get("id")}
+
+
+def parse_batter_season(payload: dict) -> dict | None:
+    """Season HR / hits / games from a hitting-group stats response."""
+    stats = payload.get("stats", [])
+    if not stats or not stats[0].get("splits"):
+        return None
+    st = stats[0]["splits"][0].get("stat", {})
+
+    def _f(key):
+        try:
+            return float(st.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return {"hr": _f("homeRuns"), "hits": _f("hits"), "games": _f("gamesPlayed")}
+
+
 def parse_pitcher_season(payload: dict) -> dict | None:
     """Season K/9, innings, starts from a people/{id}/stats response."""
     stats = payload.get("stats", [])
@@ -69,3 +91,15 @@ class MlbStatsClient:
                               params={"stats": "season", "group": "pitching"}, timeout=15)
         r.raise_for_status()
         return parse_pitcher_season(r.json())
+
+    def all_players(self, season: int) -> dict[str, int]:
+        """name(lower) -> id for all active players in a season (one call)."""
+        r = self._session.get(f"{BASE}/sports/1/players", params={"season": season}, timeout=20)
+        r.raise_for_status()
+        return parse_players(r.json())
+
+    def batter_season(self, player_id: int) -> dict | None:
+        r = self._session.get(f"{BASE}/people/{player_id}/stats",
+                              params={"stats": "season", "group": "hitting"}, timeout=15)
+        r.raise_for_status()
+        return parse_batter_season(r.json())

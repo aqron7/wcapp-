@@ -65,6 +65,31 @@ def test_outcome_strips_event_prefix():
     assert q.outcome == "TBDRASMUSSEN57-10"   # pitcher kept, not just "10"
 
 
+def test_batter_season_parse():
+    from kalshi_optimizer.data.mlb_stats import parse_batter_season, parse_players
+    pl = parse_players({"people": [{"id": 9, "fullName": "Aaron Judge"}]})
+    assert pl["aaron judge"] == 9
+    s = parse_batter_season({"stats": [{"splits": [{"stat": {
+        "homeRuns": 40, "hits": 150, "gamesPlayed": 150}}]}]})
+    assert s["hr"] == 40 and s["games"] == 150
+
+
+def test_hr_and_hits_prop_predictions():
+    from kalshi_optimizer.models.props import _prop_predictions
+    from kalshi_optimizer.types import MarketQuote
+
+    hr = MarketQuote("kalshi", "KXMLBHR-G-NYJUDGE-1", "Aaron Judge: 1+ HR?",
+                     0.2, 0.22, sport="mlb", event_key="KXMLBHR-G", outcome="NYJUDGE-1",
+                     outcome_label="Aaron Judge: 1+", market_type="prop", strike=0.5)
+    hits = MarketQuote("kalshi", "KXMLBHIT-G-NYJUDGE-2", "Aaron Judge: 2+ hits?",
+                       0.3, 0.32, sport="mlb", event_key="KXMLBHIT-G", outcome="NYJUDGE-2",
+                       outcome_label="Aaron Judge: 2+", market_type="prop", strike=1.5)
+    hr_p = _prop_predictions([hr, hits], "KXMLBHR", {"aaron judge": 0.27}, "hr")
+    hit_p = _prop_predictions([hr, hits], "KXMLBHIT", {"aaron judge": 1.0}, "hits")
+    assert len(hr_p) == 1 and hr_p[0].outcome == "NYJUDGE-1"
+    assert len(hit_p) == 1 and 0 < hit_p[0].fair_prob < 1
+
+
 def test_strikeout_model():
     s = parse_pitcher_season(STATS)
     ip = expected_innings(s)            # 100/16 = 6.25
