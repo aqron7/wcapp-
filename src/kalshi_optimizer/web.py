@@ -188,3 +188,27 @@ def api_settle() -> dict:
     conn = storage.connect()
     n = ledger.settle_pending(conn)
     return {"settled": n, "summary": ledger.summary(conn)}
+
+
+class OrderIn(BaseModel):
+    leg: dict
+    stake: float
+
+
+@app.post("/api/order")
+def api_order(o: OrderIn) -> dict:
+    """Send a single-leg order to Kalshi (or simulate when guarded/non-live)."""
+    from .execution.trader import Trader
+
+    config = Config.load()
+    try:
+        return Trader(config, KalshiClient(config.secrets)).execute_single(o.leg, o.stake)
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "reason": str(exc)}
+
+
+@app.get("/api/exec/status")
+def api_exec_status() -> dict:
+    ex = Config.load().execution
+    return {"mode": ex.mode, "kill_switch": ex.kill_switch,
+            "armed": (not ex.kill_switch) and ex.mode == "live"}

@@ -129,6 +129,25 @@ class KalshiClient:
         """Hit an authenticated endpoint to verify RSA signing actually works."""
         return self._get("/portfolio/balance")
 
+    def _post(self, route: str, body: dict) -> dict:
+        url = f"{self.base}{route}"
+        headers = self._headers("POST", route)
+        headers["Content-Type"] = "application/json"
+        resp = self._session.post(url, headers=headers, json=body, timeout=15)
+        resp.raise_for_status()
+        return resp.json()
+
+    def place_order(self, ticker: str, side: str, count: int, price_cents: int,
+                    client_order_id: str) -> dict:
+        """Place a limit buy order. side 'yes'/'no'; price in cents (1..99)."""
+        body = {
+            "ticker": ticker, "action": "buy", "side": side,
+            "count": int(count), "type": "limit",
+            "client_order_id": client_order_id,
+            ("yes_price" if side == "yes" else "no_price"): int(price_cents),
+        }
+        return self._post("/portfolio/orders", body)
+
     # ------------------------------------------------------------------ #
     # Phase 0: market data
     # ------------------------------------------------------------------ #
