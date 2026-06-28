@@ -19,15 +19,47 @@ def provider_name(secrets) -> str | None:
     return None
 
 
-def _gemini(prompt: str, system: str | None, key: str) -> str:
+# Each free-tier model has its own daily-request bucket, so falling back across
+# models routes around an exhausted quota (a fresh key in the same Google project
+# shares the same buckets). Override the first choice with GEMINI_MODEL.
+GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite",
+                 "gemini-1.5-flash"]
+
+
+def _gemini_models(key: str) -> list[str]:
+    import os
+    pref = os.getenv("GEMINI_MODEL", "").strip()
+    models = list(GEMINI_MODELS)
+    if pref:
+        models = [pref] + [m for m in models if m != pref]
+    return models
+
+
+def _gemini_one(model: str, prompt: str, system: str | None, key: str) -> str:
     url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-           f"gemini-2.0-flash:generateContent?key={key}")
+           f"{model}:generateContent?key={key}")
     text = f"{system}\n\n{prompt}" if system else prompt
     body = {"contents": [{"parts": [{"text": text}]}],
             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1200}}
     r = requests.post(url, json=body, timeout=30)
     r.raise_for_status()
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+
+
+def _gemini(prompt: str, system: str | None, key: str) -> str:
+    last: Exception | None = None
+    for model in _gemini_models(key):
+        try:
+            return _gemini_one(model, prompt, system, key)
+        except requests.HTTPError as exc:
+            code = exc.response.status_code if exc.response is not None else 0
+            if code in (404, 429):   # model gone or its daily bucket is spent — try next
+                last = exc
+                continue
+            raise
+    if last:
+        raise last
+    raise RuntimeError("no Gemini model available")
 
 
 def _anthropic(prompt: str, system: str | None, key: str) -> str:

@@ -46,6 +46,7 @@ class Secrets:
     kalshi_api_base: str = "https://demo-api.kalshi.co/trade-api/v2"
     odds_api_key: str = ""
     gemini_api_key: str = ""        # free tier: aistudio.google.com
+    gemini_model: str = ""          # optional override, e.g. gemini-2.5-flash
     anthropic_api_key: str = ""
     openai_api_key: str = ""
 
@@ -59,6 +60,7 @@ class Secrets:
             ),
             odds_api_key=os.getenv("ODDS_API_KEY", ""),
             gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
+            gemini_model=os.getenv("GEMINI_MODEL", ""),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
         )
