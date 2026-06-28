@@ -280,13 +280,32 @@ def cmd_analysts(config: Config, sport: str) -> None:
     if not provider_name(config.secrets):
         console.print("[yellow]Set GEMINI_API_KEY (free, aistudio.google.com) to use AI analysts.[/yellow]")
         return
+    from .analysts import PERSONAS, build_packets, build_prompt, generate_takes
+    from .providers import llm_complete
+
     quotes = KalshiClient(config.secrets).get_sports_markets(sport)
+    packets = build_packets(quotes, sport)
+    console.print(f"{len(quotes)} markets -> {len(packets)} games with tradeable candidate markets "
+                  f"(engine: {provider_name(config.secrets)})")
+    if not packets:
+        console.print("[yellow]No live games with liquid, non-decided markets right now.[/yellow]")
+        return
+
+    # One probe call so any LLM error is visible (not silently swallowed).
+    sample = next(iter(packets.values()))
+    try:
+        txt = llm_complete(build_prompt(PERSONAS["Quant"], sample),
+                           system="You are a sharp sports betting analyst.", secrets=config.secrets)
+        console.print(f"[green]LLM OK[/green] — sample: {txt[:160]}")
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]LLM call failed:[/red] {exc}")
+        return
+
     conn = storage.connect()
     picks = generate_takes(quotes, sport, config.secrets)
     for p in picks:
         storage.insert_analyst_pick(conn, p)
-    console.print(f"Logged {len(picks)} analyst picks for {sport} "
-                  f"(engine: {provider_name(config.secrets)}).")
+    console.print(f"Logged {len(picks)} analyst picks for {sport}.")
 
 
 def cmd_calibrate(config: Config, sport: str) -> None:
