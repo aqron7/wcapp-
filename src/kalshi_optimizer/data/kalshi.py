@@ -70,6 +70,9 @@ def parse_markets(payload: dict, sport: str, market_type: str = "winner") -> lis
         ticker = m.get("ticker", "")
         event_ticker = m.get("event_ticker")
         outcome = ticker.rsplit("-", 1)[-1] if "-" in ticker else None
+        strike = m.get("floor_strike")
+        if strike is None:
+            strike = m.get("cap_strike")
         quotes.append(
             MarketQuote(
                 platform="kalshi",
@@ -82,6 +85,7 @@ def parse_markets(payload: dict, sport: str, market_type: str = "winner") -> lis
                 outcome=outcome,
                 outcome_label=m.get("yes_sub_title"),
                 market_type=market_type,
+                strike=float(strike) if strike is not None else None,
             )
         )
     return quotes

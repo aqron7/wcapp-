@@ -43,11 +43,13 @@ def predictions_for_sport(sport: str, quotes: list[MarketQuote],
     ``form`` maps team code -> recent win rate; ``venues`` maps event_ticker ->
     venue city (for soccer altitude/host). Both optional.
     """
+    from ..models.poisson import totals_predictions
+
+    preds: list[Prediction] = []
     if sport == "mlb":
         from ..models.baseball import BaseballModel
 
         model = BaseballModel()
-        preds: list[Prediction] = []
         for event_ticker, home, away in matchups_from_quotes(quotes, "mlb"):
             # Reuse the Elo-point adjustment params to inject recent form.
             preds += model.predict_matchup(
@@ -55,10 +57,13 @@ def predictions_for_sport(sport: str, quotes: list[MarketQuote],
                 home_pitcher_adj=_form_delta(form, home),
                 away_pitcher_adj=_form_delta(form, away),
             )
-        return preds
-    if sport == "soccer":
-        return soccer_predictions(quotes, SoccerModel(), form, venues)
-    return []
+    elif sport == "soccer":
+        preds += soccer_predictions(quotes, SoccerModel(), form, venues)
+    else:
+        return []
+
+    preds += totals_predictions(quotes, sport)  # over/under markets (Poisson)
+    return preds
 
 
 def _clean_label(label: str | None) -> str:
@@ -168,11 +173,15 @@ def find_value_edges(
 
     # Per-event de-vig: normalize each game's outcome YES mids to sum to 1 so the
     # overround doesn't make every outcome look overpriced (the favorite-fade bug).
+    # Only for mutually-exclusive sets (winner/BTTS) — NOT totals/spread ladders,
+    # whose rungs don't sum to 1.
+    devig_types = {"winner", "btts", None}
     devigged: dict[tuple[str, str], float] = {}
     if do_devig:
         by_event: dict[str, dict[str, float]] = {}
         for q in quotes:
-            if q.platform == "kalshi" and q.event_key and q.outcome and q.yes_mid:
+            if (q.platform == "kalshi" and q.event_key and q.outcome and q.yes_mid
+                    and q.market_type in devig_types):
                 by_event.setdefault(q.event_key, {})[q.outcome] = q.yes_mid
         for ek, outs in by_event.items():
             if len(outs) < 2:

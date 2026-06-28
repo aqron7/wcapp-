@@ -29,6 +29,7 @@ class MarketQuote:
     outcome: str | None = None     # outcome code, e.g. "SEA", "AUS", "TIE"
     outcome_label: str | None = None   # human label, e.g. "Seattle", "Reg Time: Tie"
     market_type: str | None = None     # "winner" | "total" | "spread" | "btts" | "prop"
+    strike: float | None = None        # line for totals/spreads (e.g. 2.5)
     close_time: datetime | None = None
 
     @property
