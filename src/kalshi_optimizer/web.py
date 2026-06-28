@@ -183,6 +183,49 @@ def api_calendar() -> dict:
     return {"days": ledger.calendar(storage.connect())}
 
 
+@app.get("/api/analysts")
+def api_analysts() -> dict:
+    from .analysts import grade_and_leaderboard
+    from .providers import provider_name
+
+    conn = storage.connect()
+    lb = grade_and_leaderboard(conn)
+    games: dict[str, dict] = {}
+    for p in storage.list_analyst_picks(conn):
+        if p["status"] != "pending":
+            continue
+        g = games.setdefault(p["game_key"], {"game_key": p["game_key"],
+                                             "label": p["game_label"], "sport": p["sport"], "takes": []})
+        g["takes"].append({"analyst": p["analyst"], "side": p["side"], "price": p["price"],
+                           "confidence": p["confidence"], "rationale": p["rationale"]})
+    return {"games": list(games.values()), "leaderboard": lb["leaderboard"],
+            "provider": provider_name(Config.load().secrets)}
+
+
+@app.post("/api/analysts/generate")
+def api_analysts_generate() -> dict:
+    from .analysts import generate_takes
+    from .providers import provider_name
+
+    config = Config.load()
+    if not provider_name(config.secrets):
+        return {"ok": False, "error": "No LLM key set — add GEMINI_API_KEY (free) to .env"}
+    conn = storage.connect()
+    logged = 0
+    for sport in config.sports:
+        try:
+            if LIVE.connected and LIVE.markets:
+                quotes = [q for q in LIVE.quotes() if q.sport == sport]
+            else:
+                quotes = KalshiClient(config.secrets).get_sports_markets(sport)
+            for pick in generate_takes(quotes, sport, config.secrets):
+                storage.insert_analyst_pick(conn, pick)
+                logged += 1
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc), "logged": logged}
+    return {"ok": True, "logged": logged}
+
+
 @app.get("/api/calibration")
 def api_calibration(sport: str = "mlb") -> dict:
     """Walk-forward calibration of the winner model from settled games."""

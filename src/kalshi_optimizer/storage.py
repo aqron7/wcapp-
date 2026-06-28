@@ -49,6 +49,15 @@ CREATE TABLE IF NOT EXISTS bets (
     closing_price REAL,                   -- combined closing cost (for CLV)
     result_ts     TEXT
 );
+
+CREATE TABLE IF NOT EXISTS analyst_picks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT, date TEXT, sport TEXT, analyst TEXT,
+    game_key    TEXT, game_label TEXT,
+    market_id   TEXT, side TEXT, price REAL, confidence REAL, rationale TEXT,
+    status      TEXT DEFAULT 'pending', result TEXT, pnl REAL
+);
+CREATE INDEX IF NOT EXISTS idx_apick_analyst ON analyst_picks(analyst);
 """
 
 
@@ -108,6 +117,29 @@ def result_for_market(conn: sqlite3.Connection, market_id: str) -> str | None:
         (market_id,),
     ).fetchone()
     return row[0] if row else None
+
+
+def insert_analyst_pick(conn: sqlite3.Connection, p: dict) -> int:
+    cols = ("ts", "date", "sport", "analyst", "game_key", "game_label",
+            "market_id", "side", "price", "confidence", "rationale")
+    cur = conn.execute(
+        f"INSERT INTO analyst_picks ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+        tuple(p.get(c) for c in cols),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def list_analyst_picks(conn: sqlite3.Connection) -> list[dict]:
+    return [dict(r) for r in conn.execute("SELECT * FROM analyst_picks ORDER BY ts DESC")]
+
+
+def update_analyst_pick(conn: sqlite3.Connection, pick_id: int, **fields) -> None:
+    if not fields:
+        return
+    sets = ", ".join(f"{k}=?" for k in fields)
+    conn.execute(f"UPDATE analyst_picks SET {sets} WHERE id=?", (*fields.values(), pick_id))
+    conn.commit()
 
 
 def closing_mid(conn: sqlite3.Connection, market_id: str) -> float | None:

@@ -179,6 +179,7 @@
       <button class="ctab" data-v="games">Games &amp; picks</button>
       <button class="ctab" data-v="positions">Live bets</button>
       <button class="ctab" data-v="calendar">Calendar</button>
+      <button class="ctab" data-v="analysts">Analysts</button>
     </div>
     <div id="chartview">
       <div class="symhead" id="symhead"><h2 class="dim">Select a market</h2></div>
@@ -191,6 +192,7 @@
     <div id="gamesview" class="scroll" style="display:none"></div>
     <div id="posview" class="scroll" style="display:none"></div>
     <div id="calview" class="scroll" style="display:none"></div>
+    <div id="anaview" class="scroll" style="display:none"></div>
   </div>
 
   <!-- ticket + positions -->
@@ -406,13 +408,40 @@ function gameDate(gk){
   const dt=new Date(2000+ +m[1], MONTHS[m[2]]??0, +m[3]);
   return dt.toLocaleDateString(undefined,{month:"short",day:"numeric"});
 }
-const VIEWS={chart:"chartview",games:"gamesview",positions:"posview",calendar:"calview"};
+const VIEWS={chart:"chartview",games:"gamesview",positions:"posview",calendar:"calview",analysts:"anaview"};
 function switchView(v){
   document.querySelectorAll(".ctab").forEach(t=>t.classList.toggle("on",t.dataset.v===v));
   for(const k in VIEWS) $("#"+VIEWS[k]).style.display = (v===k)?(k==="chart"?"flex":"block"):"none";
   if(v==="games") loadGames();
   if(v==="positions") loadPositions();
   if(v==="calendar") loadCalendar();
+  if(v==="analysts") loadAnalysts();
+}
+
+async function loadAnalysts(){
+  const el=$("#anaview");
+  const d=await (await fetch("/api/analysts")).json();
+  let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+    <button class="mini" id="genana">✨ Generate today's takes</button>
+    <span class="dim" style="font-size:11px">${d.provider?('engine: '+d.provider):'set GEMINI_API_KEY (free) in .env to enable'}</span></div>`;
+  if(d.leaderboard && d.leaderboard.length){
+    html+=`<div class="gcard"><h4>Analyst leaderboard</h4>`+d.leaderboard.map(a=>`<div class="gpick">
+      <span class="gp"><b>${a.analyst}</b></span>
+      <span class="gpx">${a.settled}/${a.picks} graded</span>
+      <span class="gpx">${a.win_rate==null?'—':(a.win_rate*100).toFixed(0)+'% W'}</span>
+      <span class="gpe ${(a.pnl||0)>=0?'up':'down'}">${a.pnl==null?'—':(a.pnl>=0?'+$':'-$')+Math.abs(a.pnl).toFixed(0)}</span></div>`).join("")+`</div>`;
+  }
+  if(!d.games.length){ html+=`<div class="empty">No analyst takes yet.<br>Tap "Generate today's takes" (needs a free Gemini key).</div>`; }
+  else html+=d.games.map(g=>`<div class="gcard"><h4>${g.label}</h4><div class="gmeta">${g.sport}</div>`+
+    g.takes.map(t=>`<div class="gpick"><span class="mtype">${t.analyst}</span>
+      <span class="gp"><b class="${t.side=='yes'?'up':'down'}">${t.side.toUpperCase()}</b> ${t.rationale}</span>
+      <span class="gpe up">${(t.confidence*100).toFixed(0)}%</span></div>`).join("")+`</div>`).join("");
+  el.innerHTML=html;
+  const gb=$("#genana");
+  if(gb) gb.onclick=async()=>{ gb.textContent="✨ Generating… (up to a minute)";
+    const r=await (await fetch("/api/analysts/generate",{method:"POST"})).json();
+    gb.textContent=r.ok?`✔ ${r.logged} takes logged`:`⚠ ${r.error||'failed'}`;
+    setTimeout(loadAnalysts, 1500); };
 }
 document.querySelectorAll(".ctab").forEach(t=>t.onclick=()=>switchView(t.dataset.v));
 

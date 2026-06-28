@@ -270,6 +270,25 @@ def cmd_fit(config: Config, sport: str) -> None:
             console.print("[yellow]Not enough settled totals to fit a distribution yet.[/yellow]")
 
 
+def cmd_analysts(config: Config, sport: str) -> None:
+    """Generate + log AI analyst takes for a sport's live games."""
+    from . import storage
+    from .analysts import generate_takes
+    from .data.kalshi import KalshiClient
+    from .providers import provider_name
+
+    if not provider_name(config.secrets):
+        console.print("[yellow]Set GEMINI_API_KEY (free, aistudio.google.com) to use AI analysts.[/yellow]")
+        return
+    quotes = KalshiClient(config.secrets).get_sports_markets(sport)
+    conn = storage.connect()
+    picks = generate_takes(quotes, sport, config.secrets)
+    for p in picks:
+        storage.insert_analyst_pick(conn, p)
+    console.print(f"Logged {len(picks)} analyst picks for {sport} "
+                  f"(engine: {provider_name(config.secrets)}).")
+
+
 def cmd_calibrate(config: Config, sport: str) -> None:
     """Walk-forward calibration of the winner model from settled games."""
     from .backtest.model_backtest import report
@@ -415,6 +434,8 @@ def main() -> None:
     p_fit.add_argument("sport", help="sport key, e.g. mlb or soccer")
     p_cal = sub.add_parser("calibrate", help="walk-forward model calibration from settled games")
     p_cal.add_argument("sport", help="sport key, e.g. mlb or soccer")
+    p_ana = sub.add_parser("analysts", help="generate AI analyst takes for a sport")
+    p_ana.add_argument("sport", help="sport key, e.g. mlb or soccer")
     sub.add_parser("auth-check", help="verify Kalshi API auth on a private endpoint")
     sub.add_parser("dashboard", help="launch the web dashboard (phase 5)")
     sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
@@ -444,6 +465,9 @@ def main() -> None:
         return
     if args.command == "calibrate":
         cmd_calibrate(config, args.sport)
+        return
+    if args.command == "analysts":
+        cmd_analysts(config, args.sport)
         return
 
     {
