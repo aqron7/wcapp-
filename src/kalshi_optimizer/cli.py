@@ -278,16 +278,58 @@ def cmd_calibrate(config: Config, sport: str) -> None:
     init = ({k.lower(): v for k, v in DEFAULT_RATINGS.items()} if sport == "soccer"
             else dict(DEFAULT_MLB_RATINGS))
     r = report(games, init, k=FIT_K.get(sport, 20.0))
-    if not r.get("n"):
-        console.print(f"[yellow]No settled {sport} games to calibrate from.[/yellow]")
-        return
-    verdict = "beats coin flip" if r["brier"] < r["baseline_brier"] else "[red]no better than coin flip[/red]"
-    console.print(f"{sport}: {r['n']} games  Brier {r['brier']} vs baseline "
-                  f"{r['baseline_brier']} ({verdict}); log-loss {r['log_loss']}")
-    console.print("Reliability (pred -> actual):")
-    for bk in r["reliability"]:
-        console.print(f"  {bk['lo']:.1f}-{bk['hi']:.1f}: pred {bk['pred']:.2f} "
-                      f"actual {bk['actual']:.2f}  (n={bk['n']})")
+
+    def show(label, m):
+        if not m.get("n"):
+            console.print(f"[yellow]{label}: no settled markets to calibrate from.[/yellow]")
+            return
+        verdict = "beats coin flip" if m["brier"] < m["baseline_brier"] else "[red]no better than coin flip[/red]"
+        console.print(f"[bold]{label}[/bold]: {m['n']}  Brier {m['brier']} vs baseline "
+                      f"{m['baseline_brier']} ({verdict}); log-loss {m['log_loss']}")
+        for bk in m["reliability"]:
+            console.print(f"  {bk['lo']:.1f}-{bk['hi']:.1f}: pred {bk['pred']:.2f} "
+                          f"actual {bk['actual']:.2f}  (n={bk['n']})")
+
+    show(f"{sport} winner", r)
+    show(f"{sport} totals", _totals_calibration(kalshi, sport))
+
+
+def _totals_calibration(kalshi, sport: str) -> dict:
+    """Build totals calibration: flat Poisson for MLB, Dixon-Coles for soccer."""
+    from .backtest.model_backtest import totals_calibration
+    from .models.poisson import AVG_TOTAL, prob_over
+
+    totals_series = {"mlb": "KXMLBTOTAL", "soccer": "KXWCTOTAL"}.get(sport)
+    if not totals_series:
+        return {"n": 0}
+    settled = list(kalshi.iter_raw_markets(sport, status="settled", series_list=[totals_series]))
+
+    if sport == "mlb":
+        lam = AVG_TOTAL["mlb"]
+        return totals_calibration(settled, lambda line, ev: prob_over(lam, line))
+
+    # soccer: Dixon-Coles per game, teams from settled winner markets
+    from .models import dixon_coles as dc
+    from .models.soccer import SoccerModel
+
+    winner = list(kalshi.iter_raw_markets("soccer", status="settled", series_list=["KXWCGAME"]))
+    labels: dict[str, list[str]] = {}
+    for m in winner:
+        tk, ev = m.get("ticker", ""), m.get("event_ticker", "")
+        code = tk[len(ev) + 1:] if ev and tk.startswith(ev + "-") else None
+        if not code or code == "TIE":
+            continue
+        gk = ev.split("-", 1)[1] if "-" in ev else ev
+        labels.setdefault(gk, []).append((m.get("yes_sub_title") or "").split(":", 1)[-1].strip())
+    model = SoccerModel()
+    matrices = {gk: model.score_matrix(l[0], l[1]) for gk, l in labels.items() if len(l) == 2}
+
+    def fn(line, ev):
+        gk = ev.split("-", 1)[1] if "-" in ev else ev
+        m = matrices.get(gk)
+        return dc.prob_over(m, line) if m else None
+
+    return totals_calibration(settled, fn)
 
 
 def cmd_auth_check(config: Config) -> None:

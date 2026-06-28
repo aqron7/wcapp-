@@ -1,7 +1,20 @@
 """Tests for calibration backtest, live positions, and the calendar."""
 
 from kalshi_optimizer import ledger, storage
-from kalshi_optimizer.backtest.model_backtest import report, walk_forward
+from kalshi_optimizer.backtest.model_backtest import report, totals_calibration, walk_forward
+from kalshi_optimizer.models.poisson import prob_over
+
+
+def test_totals_calibration_scores_settled_overs():
+    # Two settled MLB totals: over 8.5 (went over) and over 11.5 (stayed under).
+    settled = [
+        {"floor_strike": 8.5, "result": "yes", "event_ticker": "E1"},
+        {"floor_strike": 11.5, "result": "no", "event_ticker": "E2"},
+        {"floor_strike": 0, "result": "", "event_ticker": "E3"},  # unsettled -> skipped
+    ]
+    m = totals_calibration(settled, lambda line, ev: prob_over(8.6, line))
+    assert m["n"] == 2
+    assert "brier" in m and 0 <= m["brier"] <= 1
 
 
 def test_walk_forward_beats_coin_flip_when_signal_exists():

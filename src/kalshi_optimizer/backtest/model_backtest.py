@@ -48,8 +48,7 @@ def reliability(preds: list[float], outs: list[float], nbins: int = 10) -> list[
     return bins
 
 
-def report(games: list[tuple[str, str, float]], init: dict[str, float], k: float = 20.0) -> dict:
-    preds, outs = walk_forward(games, init, k)
+def _metrics(preds: list[float], outs: list[float]) -> dict:
     if not preds:
         return {"n": 0}
     decisive = [(p, int(o)) for p, o in zip(preds, outs) if o in (0.0, 1.0)]
@@ -62,3 +61,27 @@ def report(games: list[tuple[str, str, float]], init: dict[str, float], k: float
         "log_loss": round(log_loss(dp, do), 4) if dp else None,
         "reliability": reliability(preds, outs),
     }
+
+
+def report(games: list[tuple[str, str, float]], init: dict[str, float], k: float = 20.0) -> dict:
+    preds, outs = walk_forward(games, init, k)
+    return _metrics(preds, outs)
+
+
+def totals_calibration(settled_totals: list[dict], prob_fn) -> dict:
+    """Calibration of a totals model over settled over/under markets.
+
+    ``prob_fn(line, event_ticker) -> P(over)`` (or None to skip a market). No
+    walk-forward needed: the totals model uses a fixed prior, not fit on these
+    games, so there's no leakage.
+    """
+    preds, outs = [], []
+    for m in settled_totals:
+        if m.get("result") not in ("yes", "no") or m.get("floor_strike") is None:
+            continue
+        p = prob_fn(float(m["floor_strike"]), m.get("event_ticker", ""))
+        if p is None:
+            continue
+        preds.append(p)
+        outs.append(1.0 if m["result"] == "yes" else 0.0)
+    return _metrics(preds, outs)
