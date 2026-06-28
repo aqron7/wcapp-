@@ -39,10 +39,13 @@ def test_soccer_predictions_cover_all_three_outcomes():
 
 
 def test_soccer_value_edge_found_pure_model():
-    # model_weight=1.0 tests the raw mechanism (no market regression).
+    # Raw mechanism: no market regression, no calibration.
+    config = Config()
+    config.edge.devig = False
+    config.edge.model_sharpen = 1.0
     quotes = _soccer_quotes()
     preds = soccer_predictions(quotes, SoccerModel())
-    ideas = find_value_edges(quotes, preds, Config(), model_weight=1.0)
+    ideas = find_value_edges(quotes, preds, config, model_weight=1.0)
     assert len(ideas) == 1
     assert ideas[0].edge > 0.03
     assert ideas[0].side in (Side.YES, Side.NO)

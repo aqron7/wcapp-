@@ -157,10 +157,28 @@ def find_value_edges(
     defaults to config.edge.model_weight. ``market_probs`` can override the
     market prior per outcome (e.g. a sharper external source).
     """
+    from .calibration import devig, sharpen
+
     if model_weight is None:
         model_weight = getattr(config.edge, "model_weight", 0.5)
+    gamma = getattr(config.edge, "model_sharpen", 1.0)
+    do_devig = getattr(config.edge, "devig", True)
     pred_index = {(p.event_key, p.outcome): p.fair_prob for p in predictions}
     market_probs = market_probs or {}
+
+    # Per-event de-vig: normalize each game's outcome YES mids to sum to 1 so the
+    # overround doesn't make every outcome look overpriced (the favorite-fade bug).
+    devigged: dict[tuple[str, str], float] = {}
+    if do_devig:
+        by_event: dict[str, dict[str, float]] = {}
+        for q in quotes:
+            if q.platform == "kalshi" and q.event_key and q.outcome and q.yes_mid:
+                by_event.setdefault(q.event_key, {})[q.outcome] = q.yes_mid
+        for ek, outs in by_event.items():
+            if len(outs) < 2:
+                continue  # need the full outcome set to remove the overround
+            for outcome, prob in devig(outs).items():
+                devigged[(ek, outcome)] = prob
 
     candidates: list[TradeIdea] = []
     for q in quotes:
@@ -171,11 +189,12 @@ def find_value_edges(
         model_p = pred_index.get((q.event_key, q.outcome))
         if model_p is None:
             continue
+        model_p = sharpen(model_p, gamma)  # fix model under-confidence
 
-        # Market prior: an explicit source if given, else this market's own mid.
+        # Market prior: explicit source, else de-vigged market, else raw mid.
         market_prior = market_probs.get((q.event_key, q.outcome))
         if market_prior is None:
-            market_prior = q.yes_mid
+            market_prior = devigged.get((q.event_key, q.outcome), q.yes_mid)
         fair = blend(model_p, market_prior, model_weight)
         side, entry, edge = evaluate_market(fair, q.yes_bid, q.yes_ask, config.edge.kalshi_fee)
         if edge < config.edge.min_edge:

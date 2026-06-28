@@ -17,6 +17,11 @@ edge:
   model_weight: 0.5       # fair = w*model + (1-w)*market price. Lower = trust the
                           # market more (the market is sharp; the model is unproven).
                           # Raise toward 1.0 only once the backtester validates the model.
+  devig: true             # remove each market's overround before comparing (stops the
+                          # structural "fade the favorite" bias). Keep on.
+  model_sharpen: 1.25     # >1 corrects model under-confidence so edges are two-sided.
+                          # Ideally fit from settled results; tune down toward 1.0 if
+                          # the model starts over-betting longshots.
 
 arbitrage:
   min_profit: 0.01        # min guaranteed profit fraction to flag an arb
