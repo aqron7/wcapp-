@@ -232,6 +232,34 @@ def cmd_demo_edges(config: Config) -> None:
     _render_ideas(ideas, "MLB value edges (demo fixtures)")
 
 
+def cmd_fit(config: Config, sport: str) -> None:
+    """Fit Elo ratings from Kalshi's settled winner markets and save them."""
+    from .data.kalshi import KalshiClient
+    from .models.baseball import DEFAULT_MLB_RATINGS
+    from .models.fit import FIT_K, fit_ratings, games_from_settled, ratings_path, save_ratings
+    from .models.soccer import DEFAULT_RATINGS
+
+    winner_series = {"soccer": "KXWCGAME", "mlb": "KXMLBGAME"}.get(sport)
+    if not winner_series:
+        console.print(f"[yellow]no winner series for {sport}[/yellow]")
+        return
+
+    kalshi = KalshiClient(config.secrets)
+    raw = list(kalshi.iter_raw_markets(sport, status="settled", series_list=[winner_series]))
+    games = games_from_settled(raw, sport)
+    if not games:
+        console.print(f"[yellow]No settled {sport} games found yet to fit from.[/yellow]")
+        return
+
+    init = ({k.lower(): v for k, v in DEFAULT_RATINGS.items()} if sport == "soccer"
+            else dict(DEFAULT_MLB_RATINGS))
+    ratings = fit_ratings(games, init, k=FIT_K.get(sport, 20.0))
+    save_ratings(sport, ratings)
+    top = sorted(ratings.items(), key=lambda kv: kv[1], reverse=True)[:5]
+    console.print(f"Fitted {len(games)} games -> {ratings_path(sport)}")
+    console.print("Top: " + ", ".join(f"{k} {v:.0f}" for k, v in top))
+
+
 def cmd_auth_check(config: Config) -> None:
     """Verify RSA signing against an authenticated Kalshi endpoint."""
     kalshi = KalshiClient(config.secrets)
@@ -301,6 +329,8 @@ def main() -> None:
     sub.add_parser("demo-arb", help="run arb scanner on bundled fixtures (no network)")
     sub.add_parser("find-edges", help="ranked model-vs-Kalshi value bets (phase 2+)")
     sub.add_parser("demo-edges", help="run value engine on bundled fixtures (no network)")
+    p_fit = sub.add_parser("fit", help="fit Elo ratings from settled games")
+    p_fit.add_argument("sport", help="sport key, e.g. mlb or soccer")
     sub.add_parser("auth-check", help="verify Kalshi API auth on a private endpoint")
     sub.add_parser("dashboard", help="launch the web dashboard (phase 5)")
     sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
@@ -324,6 +354,9 @@ def main() -> None:
         return
     if args.command == "raw":
         cmd_raw(config, args.sport, args.series)
+        return
+    if args.command == "fit":
+        cmd_fit(config, args.sport)
         return
 
     {

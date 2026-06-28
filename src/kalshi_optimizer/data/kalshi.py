@@ -203,10 +203,11 @@ class KalshiClient:
         url = f"wss://{host}{self.WS_PATH}"
         return url, self._sign("GET", self.WS_PATH)
 
-    def iter_raw_markets(self, sport: str, status: str | None = None):
-        """Yield raw market dicts for a sport, paging all series (for logging
-        settlements). ``status`` filters server-side, e.g. "settled"."""
-        for series in SPORT_SERIES.get(sport, []):
+    def iter_raw_markets(self, sport: str, status: str | None = None,
+                         series_list: list[str] | None = None):
+        """Yield raw market dicts for a sport, paging the given series (default:
+        all for the sport). ``status`` filters server-side, e.g. "settled"."""
+        for series in (series_list or SPORT_SERIES.get(sport, [])):
             cursor: str | None = None
             while True:
                 params: dict = {"series_ticker": series, "limit": 200}

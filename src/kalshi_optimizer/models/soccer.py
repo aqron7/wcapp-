@@ -36,6 +36,9 @@ DEFAULT_RATINGS: dict[str, float] = {
 class SoccerModel:
     def __init__(self, ratings: dict[str, float] | None = None, max_draw: float = 0.28):
         self.ratings = {k.lower(): v for k, v in (ratings or DEFAULT_RATINGS).items()}
+        if ratings is None:
+            from .fit import load_ratings
+            self.ratings.update(load_ratings("soccer"))  # fitted ratings override seeds
         self.base = 1500.0
         self.max_draw = max_draw
 

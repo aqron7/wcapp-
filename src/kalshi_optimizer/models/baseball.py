@@ -43,6 +43,8 @@ class BaseballModel:
         # MLB-calibrated-ish defaults: low K (long season), modest home edge.
         self.elo = EloModel(k=4.0, home_advantage=24.0)
         self.elo.ratings.update(DEFAULT_MLB_RATINGS)
+        from .fit import load_ratings
+        self.elo.ratings.update(load_ratings("mlb"))  # fitted ratings override seeds
 
     def fit(self, games: list[GameResult]) -> None:
         """Update ratings over a chronological list of historical games."""
