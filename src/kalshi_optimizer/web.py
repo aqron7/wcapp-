@@ -89,6 +89,37 @@ def api_edges(sports: str = "soccer,mlb", min_edge: float = 0.03,
     return {"edges": edges, "errors": errors, "live": False}
 
 
+@app.get("/api/history")
+def api_history(market_id: str) -> dict:
+    """Price/model time series for one market (for the chart), from snapshots."""
+    conn = storage.connect()
+    rows = conn.execute(
+        "SELECT ts, yes_bid, yes_ask, model_fair FROM snapshots "
+        "WHERE market_id=? AND status='active' ORDER BY ts",
+        (market_id,),
+    ).fetchall()
+    points = [
+        {"ts": ts,
+         "mid": (yb + ya) / 2 if yb is not None and ya is not None else None,
+         "fair": fair}
+        for ts, yb, ya, fair in rows
+    ]
+    return {"market_id": market_id, "points": points}
+
+
+@app.get("/api/account")
+def api_account() -> dict:
+    try:
+        config = Config.load()
+        bal = KalshiClient(config.secrets).auth_check()
+        dollars = bal.get("balance_dollars")
+        if dollars is None and "balance" in bal:
+            dollars = bal["balance"] / 100.0
+        return {"ok": True, "balance": dollars}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+
 @app.get("/api/live/status")
 def api_live_status() -> dict:
     return {"connected": LIVE.connected, "markets": len(LIVE.markets),

@@ -3,414 +3,373 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Kalshi Edge — the ledger</title>
+<title>Kalshi Edge Terminal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 <style>
   :root{
-    --paper:#E7EEDD;          /* pale accounting-pad green */
-    --card:#F4F7EC;           /* lighter leaf */
-    --rule:rgba(28,64,84,.14);
-    --grid:rgba(28,64,84,.07);
-    --ink:#16242B;            /* ballpoint near-black */
-    --blue:#1D4E89;           /* ledger ink blue */
-    --green:#1B7A3D;          /* won */
-    --red:#BE2A1C;            /* lost / margin / negative */
-    --hl:#F4ED5A;             /* highlighter */
-    --pencil:#5F7064;         /* muted */
+    --bg:#0f1217; --panel:#161a21; --panel2:#1b212b; --border:#272c38;
+    --text:#d1d4dc; --dim:#787b86; --bright:#fff;
+    --up:#26a69a; --down:#ef5350; --accent:#2962ff; --gold:#f0b90b;
   }
   *{box-sizing:border-box}
-  html,body{margin:0}
-  body{
-    color:var(--ink);
-    font-family:"IBM Plex Sans",system-ui,sans-serif;
-    background-color:var(--paper);
-    background-image:repeating-linear-gradient(var(--paper) 0 27px, var(--rule) 27px 28px);
-    -webkit-font-smoothing:antialiased;min-height:100vh;
-  }
-  .mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
-  h1,h2,h3,.disp{font-family:"Space Grotesk",sans-serif}
-  .pos{color:var(--green)} .neg{color:var(--red)}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;
+    font-size:13px;-webkit-font-smoothing:antialiased;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  .mono{font-family:"Roboto Mono",monospace;font-variant-numeric:tabular-nums}
+  .up{color:var(--up)} .down{color:var(--down)} .dim{color:var(--dim)}
 
-  /* masthead */
-  header{display:flex;align-items:flex-end;gap:18px;max-width:1180px;margin:0 auto;
-    padding:30px 26px 14px;border-bottom:2px solid var(--ink)}
-  header .mark{width:30px;height:30px;border:2px solid var(--ink);border-radius:50%;
-    display:grid;place-items:center;font-family:"Space Grotesk";font-weight:700;margin-bottom:4px}
-  h1{font-weight:700;font-size:30px;letter-spacing:-.01em;text-transform:uppercase;margin:0;line-height:1}
-  h1 em{font-style:normal;color:var(--blue)}
-  header .meta{margin-left:auto;text-align:right;font-family:"IBM Plex Mono";font-size:12px;color:var(--pencil)}
-  .livepill{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:.04em;display:inline-block}
-  .livepill.on{color:var(--green)}
-  .livepill.on::first-letter{color:var(--green)}
-  .livepill.off{color:var(--pencil)}
-  @keyframes blip{50%{opacity:.3}}
-  .livepill.on{animation:blip 1.6s ease-in-out infinite}
+  /* topbar */
+  .top{display:flex;align-items:center;gap:18px;padding:0 16px;height:48px;
+    background:var(--panel);border-bottom:1px solid var(--border);flex:none}
+  .logo{font-weight:700;letter-spacing:.04em;font-size:15px}
+  .logo b{color:var(--accent)}
+  .tag{font-size:10px;color:var(--dim);border:1px solid var(--border);padding:2px 6px;border-radius:3px;letter-spacing:.12em}
+  .top .stat{display:flex;flex-direction:column;line-height:1.15}
+  .top .stat .k{font-size:9px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase}
+  .top .stat .v{font-family:"Roboto Mono";font-weight:500;font-size:14px}
+  .grow{flex:1}
+  .pill{font-family:"Roboto Mono";font-size:11px;display:flex;align-items:center;gap:6px;color:var(--dim)}
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--dim)}
+  .pill.live .dot{background:var(--up);box-shadow:0 0 7px var(--up);animation:blip 1.6s infinite}
+  @keyframes blip{50%{opacity:.4}}
+  .badge{font-size:10px;font-weight:700;letter-spacing:.1em;padding:4px 8px;border-radius:3px;text-transform:uppercase}
+  .badge.unvalid{color:var(--down);border:1px solid var(--down)}
+  .badge.valid{color:#04140e;background:var(--up)}
 
-  /* rubber stamp */
-  .stamp{display:inline-flex;align-items:center;gap:6px;font-family:"Space Grotesk";font-weight:700;
-    text-transform:uppercase;letter-spacing:.13em;font-size:12px;padding:5px 11px;border:2px solid currentColor;
-    border-radius:3px;transform:rotate(-4deg);opacity:.9;position:relative}
-  .stamp::after{content:"";position:absolute;inset:2px;border:1px solid currentColor;border-radius:2px;opacity:.45}
-  .stamp.won{color:var(--green)} .stamp.lost{color:var(--red)}
-  .stamp.pending{color:var(--blue)} .stamp.unvalid{color:var(--red)}
+  /* layout */
+  .wrap{flex:1;display:grid;grid-template-columns:286px 1fr 332px;min-height:0}
+  .col{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .col.left{border-right:1px solid var(--border)}
+  .col.right{border-left:1px solid var(--border)}
+  .ph{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex:none}
+  .scroll{overflow:auto;min-height:0}
 
-  main{max-width:1180px;margin:0 auto;padding:24px 26px 90px}
-  .grid2{display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start}
-  .eyebrow{font-family:"Space Grotesk";text-transform:uppercase;letter-spacing:.2em;font-size:12px;
-    color:var(--pencil);margin:0 0 4px}
-  .sub{color:var(--pencil);font-size:12px;margin:0 0 14px}
+  /* watchlist */
+  .filters{display:flex;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);flex:none}
+  .chip{font-size:11px;border:1px solid var(--border);color:var(--dim);padding:3px 9px;border-radius:3px;cursor:pointer}
+  .chip.on{border-color:var(--accent);color:var(--bright)}
+  .filters input[type=range]{flex:1;accent-color:var(--accent)}
+  .wl{display:grid;grid-template-columns:1fr auto auto;gap:2px 10px;align-items:center;
+    padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer}
+  .wl:hover{background:var(--panel)}
+  .wl.sel{background:var(--panel2);box-shadow:inset 2px 0 0 var(--accent)}
+  .wl .sym{font-weight:600;font-size:12px}
+  .wl .meta{grid-column:1;font-size:10px;color:var(--dim)}
+  .wl .px{font-family:"Roboto Mono";font-size:13px;text-align:right}
+  .wl .eg{font-family:"Roboto Mono";font-size:12px;font-weight:500;text-align:right}
+  .wl .side{font-size:9px;padding:1px 5px;border-radius:2px;font-weight:700;letter-spacing:.05em}
+  .wl .side.yes{color:var(--up);border:1px solid var(--up)} .wl .side.no{color:var(--down);border:1px solid var(--down)}
 
-  .card{background:var(--card);border:1px solid var(--rule);border-radius:2px;
-    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
-    background-size:23px 23px}
-  .card.pad{padding:18px 20px}
-  /* red margin line down the ledger */
-  .ledger{border-left:3px solid var(--red)}
+  /* chart center */
+  .symhead{display:flex;align-items:baseline;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);flex:none}
+  .symhead h2{margin:0;font-size:18px;font-weight:700}
+  .symhead .last{font-family:"Roboto Mono";font-size:24px;font-weight:700}
+  .symhead .eg{font-family:"Roboto Mono";font-size:14px}
+  .symhead .legend{margin-left:auto;display:flex;gap:14px;font-size:11px;color:var(--dim);align-items:center}
+  .legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
+  .chartbox{position:relative;flex:1;min-height:0;padding:6px 10px 0}
+  #chart{width:100%;height:100%;display:block}
+  .chart-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--dim);font-family:"Roboto Mono";font-size:12px}
+  .readout{display:flex;gap:26px;padding:10px 18px;border-top:1px solid var(--border);flex:none}
+  .readout .r .k{font-size:9px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase}
+  .readout .r .v{font-family:"Roboto Mono";font-size:16px;font-weight:500}
 
-  /* best-bets rows */
-  .bet{display:grid;grid-template-columns:1fr 132px 120px 78px 64px 34px;gap:14px;align-items:center;
-    padding:13px 16px;border-bottom:1px solid var(--rule)}
-  .bet:last-child{border-bottom:0}
-  .game{font-family:"Space Grotesk";font-weight:600;font-size:16px;text-transform:uppercase;line-height:1.1}
-  .game .tag{display:block;font-family:"IBM Plex Mono";font-size:11px;color:var(--pencil);
-    text-transform:none;font-weight:400;margin-top:3px}
-  .pick{font-family:"Space Grotesk";font-weight:700;font-size:13px;text-transform:uppercase}
-  .pick small{display:block;color:var(--pencil);font-weight:500;font-size:11px;letter-spacing:.04em}
-  .gauge{position:relative;height:16px}
-  .gauge .bl{position:absolute;top:7px;left:0;right:0;height:1px;background:var(--ink);opacity:.3}
-  .gauge .seg{position:absolute;top:6px;height:3px;background:var(--blue)}
-  .gauge .mk{position:absolute;top:3px;width:9px;height:9px;border-radius:50%;transform:translateX(-50%)}
-  .gauge .mk.f{background:var(--blue)} .gauge .mk.p{background:transparent;border:2px solid var(--ink)}
-  .gauge .lab{position:absolute;top:-1px;font-family:"IBM Plex Mono";font-size:10px;color:var(--pencil)}
-  .edge{font-family:"IBM Plex Mono";font-weight:700;color:var(--blue);text-align:right;font-size:14px}
-  .stk{font-family:"IBM Plex Mono";text-align:right;font-size:13px;color:var(--pencil)}
-  .add{width:26px;height:26px;border:1.5px solid var(--ink);background:transparent;border-radius:3px;
-    cursor:pointer;font-size:16px;line-height:1;color:var(--ink)}
-  .add:hover{background:var(--ink);color:var(--card)}
-  .bet.top{position:relative}
-  .bet.top .game::before{content:"";position:absolute;left:4px;right:42%;top:1px;height:19px;
-    background:var(--hl);mix-blend-mode:multiply;transform:skewX(-9deg);z-index:0;opacity:.85}
-  .bet.top .game{position:relative;z-index:1}
+  /* right: ticket + positions */
+  .ticket{padding:14px;border-bottom:1px solid var(--border);flex:none}
+  .ticket .row{display:flex;gap:8px;margin-bottom:9px}
+  .sidebtn{flex:1;text-align:center;padding:8px;border:1px solid var(--border);border-radius:4px;cursor:pointer;
+    font-weight:700;font-size:12px;letter-spacing:.05em;color:var(--dim);background:var(--panel)}
+  .sidebtn.yes.on{border-color:var(--up);color:var(--up);background:rgba(38,166,154,.08)}
+  .sidebtn.no.on{border-color:var(--down);color:var(--down);background:rgba(239,83,80,.08)}
+  .field{flex:1}
+  .field label{font-size:9px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px}
+  .field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);
+    font-family:"Roboto Mono";font-size:14px;padding:8px}
+  .btn{width:100%;border:0;border-radius:4px;padding:10px;font-weight:700;font-size:12px;letter-spacing:.05em;cursor:pointer}
+  .btn.log{background:var(--accent);color:#fff;margin-bottom:8px}
+  .btn.send{background:transparent;border:1px solid var(--down);color:var(--down)}
+  .btn.send[disabled]{opacity:.4;cursor:not-allowed}
+  .btn.add{background:var(--panel2);color:var(--text);border:1px solid var(--border);margin-bottom:8px}
+  .execnote{font-family:"Roboto Mono";font-size:10px;color:var(--dim);margin-top:6px;text-align:center}
+  .ores{font-family:"Roboto Mono";font-size:11px;margin-top:8px;text-align:center}
 
-  /* bet slip */
-  .slip{position:sticky;top:18px}
-  .slip h3{margin:0 0 2px;font-size:17px;text-transform:uppercase;letter-spacing:.04em}
-  .perf{height:10px;background:radial-gradient(circle at 6px 50%, transparent 0 5px, var(--card) 5px) repeat-x;
-    background-size:14px 10px;border-bottom:1px dashed var(--rule);margin:0 -20px 12px}
-  .leg{display:flex;gap:8px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--rule);font-size:13px}
-  .leg .x{margin-left:auto;cursor:pointer;color:var(--pencil);font-family:"IBM Plex Mono")}
-  .leg .x:hover{color:var(--red)}
-  .leg .lp{font-family:"IBM Plex Mono";color:var(--pencil);font-size:12px}
-  .slip .empty{color:var(--pencil);font-size:13px;padding:14px 0;text-align:center;font-style:italic}
-  .combine{margin-top:12px;border-top:2px solid var(--ink);padding-top:12px;display:grid;
-    grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center}
-  .combine div span{display:block;font-family:"IBM Plex Mono";font-weight:700;font-size:17px}
-  .combine div small{font-family:"Space Grotesk";text-transform:uppercase;letter-spacing:.1em;
-    font-size:10px;color:var(--pencil)}
-  .warn{color:var(--red);font-size:12px;font-family:"IBM Plex Mono";margin:10px 0 0;
-    border-left:2px solid var(--red);padding-left:8px}
-  .execrow{margin-top:12px;font-family:"IBM Plex Mono";font-size:12px;color:var(--pencil);
-    display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .execrow .send{font-family:"Space Grotesk";font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-    font-size:12px;border:1.5px solid var(--red);color:var(--red);background:transparent;
-    padding:6px 11px;border-radius:2px;cursor:pointer}
-  .execrow .send[disabled]{opacity:.45;cursor:not-allowed;border-color:var(--pencil);color:var(--pencil)}
-  .execrow .send.armed:hover{background:var(--red);color:var(--card)}
-  .execrow .res{flex-basis:100%}
-  .stakebar{display:flex;gap:8px;margin-top:14px}
-  .stakebar input{flex:1;font-family:"IBM Plex Mono";font-size:15px;padding:9px 10px;border:1.5px solid var(--ink);
-    background:var(--paper);border-radius:2px;color:var(--ink)}
-  button.primary{font-family:"Space Grotesk";font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-    background:var(--ink);color:var(--card);border:0;padding:9px 16px;border-radius:2px;cursor:pointer;font-size:14px}
-  button.primary:hover{background:var(--blue)}
-  button.minor{font-family:"Space Grotesk";font-weight:600;text-transform:uppercase;letter-spacing:.06em;
-    background:transparent;border:1.5px solid var(--ink);padding:7px 13px;border-radius:2px;cursor:pointer;font-size:13px;color:var(--ink)}
-  button.minor:hover{border-color:var(--blue);color:var(--blue)}
+  .slip{padding:10px 14px;border-bottom:1px solid var(--border)}
+  .slip .leg{display:flex;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border);gap:8px}
+  .slip .leg .x{margin-left:auto;color:var(--dim);cursor:pointer}
+  .slip .comb{display:flex;justify-content:space-between;font-family:"Roboto Mono";font-size:12px;margin-top:8px}
 
-  /* ledger section */
-  .section{margin-top:30px}
-  .lhead{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:10px}
-  .totals{margin-left:auto;display:flex;gap:18px;font-family:"IBM Plex Mono";font-size:13px}
-  .totals b{font-weight:700;font-size:16px}
-  .totals span{color:var(--pencil);font-size:11px;display:block;font-family:"Space Grotesk";letter-spacing:.08em;text-transform:uppercase}
-  .pnlcurve{width:100%;height:70px;display:block;margin:6px 0 0}
-  .entry{display:grid;grid-template-columns:120px 1fr 110px 90px;gap:14px;align-items:center;
-    padding:12px 16px;border-bottom:1px solid var(--rule)}
-  .entry:last-child{border-bottom:0}
-  .entry .when{font-family:"IBM Plex Mono";font-size:11px;color:var(--pencil)}
-  .entry .desc{font-family:"Space Grotesk";font-weight:600;font-size:14px;text-transform:uppercase}
-  .entry .desc small{display:block;font-family:"IBM Plex Mono";font-weight:400;font-size:11px;color:var(--pencil);text-transform:none}
-  .entry .amt{font-family:"IBM Plex Mono";font-weight:700;text-align:right;font-size:15px}
+  .pos{padding:6px 0}
+  .sumrow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border)}
+  .sumrow .k{font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+  .sumrow .v{font-family:"Roboto Mono";font-size:14px;font-weight:600}
+  .bet{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:11px}
+  .bet .st{width:7px;height:7px;border-radius:50%;flex:none}
+  .bet .st.won{background:var(--up)} .bet .st.lost{background:var(--down)} .bet .st.pending{background:var(--gold)}
+  .bet .amt{margin-left:auto;font-family:"Roboto Mono"}
 
-  .panels{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:30px}
-  .stat{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule)}
-  .stat:last-child{border-bottom:0}
-  .stat .k{color:var(--pencil);font-size:13px}
-  .stat .v{font-family:"IBM Plex Mono";font-weight:700;font-size:16px}
-  .note{color:var(--pencil);font-size:12px;line-height:1.6;margin:12px 0 0}
-  .empty{padding:26px 16px;color:var(--pencil);font-family:"IBM Plex Mono";font-size:13px;line-height:1.7}
-  .errbox div{border-left:2px solid var(--red);padding:8px 12px;margin:10px 0;color:var(--red);
-    font-family:"IBM Plex Mono";font-size:12px;background:rgba(190,42,28,.05)}
-
-  @media (max-width:880px){.grid2{grid-template-columns:1fr}.slip{position:static}
-    .bet{grid-template-columns:1fr 90px 60px 30px}.bet .gauge,.bet .stk{display:none}
-    .panels{grid-template-columns:1fr}.entry{grid-template-columns:1fr 90px}.entry .when,.entry .desc small{display:none}}
-  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  .foot{display:flex;gap:18px;padding:7px 16px;background:var(--panel);border-top:1px solid var(--border);
+    font-family:"Roboto Mono";font-size:11px;color:var(--dim);flex:none;align-items:center}
+  .foot b{color:var(--text);font-weight:500}
+  button.mini{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:3px;
+    font-size:10px;padding:3px 8px;cursor:pointer;letter-spacing:.06em}
+  .empty{padding:20px 14px;color:var(--dim);font-family:"Roboto Mono";font-size:11px;text-align:center;line-height:1.7}
+  @media (max-width:1100px){.wrap{grid-template-columns:1fr}.col.left,.col.right{display:none}}
 </style>
 </head>
 <body>
-<header>
-  <span class="mark">K</span>
-  <h1>Kalshi Edge <em>Ledger</em></h1>
-  <div class="meta">
-    <div id="livepill" class="livepill off">● offline · REST</div>
-    <div id="today" style="margin:4px 0">—</div>
-    <div id="gatestamp"><span class="stamp unvalid">▲ Unvalidated</span></div>
-  </div>
-</header>
+<div class="top">
+  <span class="logo">KALSHI <b>EDGE</b></span><span class="tag">TERMINAL</span>
+  <div class="stat"><span class="k">Balance</span><span class="v mono" id="bal">—</span></div>
+  <div class="stat"><span class="k">Ledger P&L</span><span class="v mono" id="topPnl">—</span></div>
+  <div class="stat"><span class="k">Mean CLV</span><span class="v mono" id="topClv">—</span></div>
+  <span class="grow"></span>
+  <span class="badge unvalid" id="gate">▲ Unvalidated</span>
+  <span class="pill" id="pill"><span class="dot"></span>offline · REST</span>
+</div>
 
-<main>
-  <div class="errbox" id="errbox"></div>
-  <div class="grid2">
-    <!-- best bets -->
-    <section>
-      <p class="eyebrow">Today's best bets</p>
-      <p class="sub">Ranked by model edge. Altitude, host and recent-form adjustments fold into the
-        fair value when a venue is known. These are signals — not advice — until the ledger's CLV turns positive.</p>
-      <div class="card" id="bestbets"><div class="empty">Reading the board…</div></div>
-    </section>
-
-    <!-- bet slip -->
-    <aside class="slip">
-      <div class="card pad">
-        <h3>Bet slip</h3>
-        <div class="perf"></div>
-        <div id="legs"><div class="empty">Tap ＋ on a bet to add a leg.<br>Two or more legs = parlay.</div></div>
-        <div class="combine" id="combine" style="display:none">
-          <div><span id="cFair">—</span><small>model</small></div>
-          <div><span id="cPrice">—</span><small>cost</small></div>
-          <div><span id="cEdge">—</span><small>edge</small></div>
-        </div>
-        <div id="corr"></div>
-        <div class="stakebar">
-          <input id="stake" class="mono" type="number" placeholder="stake $" min="0" />
-          <button class="primary" id="place">Log to ledger</button>
-        </div>
-        <div id="execrow" class="execrow"></div>
-      </div>
-    </aside>
+<div class="wrap">
+  <!-- watchlist -->
+  <div class="col left">
+    <div class="ph">Watchlist
+      <span class="grow"></span><span class="mono" id="wlcount" style="font-size:11px"></span></div>
+    <div class="filters">
+      <span class="chip on" data-s="soccer">SOC</span>
+      <span class="chip on" data-s="mlb">MLB</span>
+      <span class="dim mono" style="font-size:10px">edge</span>
+      <input type="range" id="minedge" min="0" max="15" value="3"/>
+      <span class="dim mono" id="minlbl" style="font-size:10px">3%</span>
+    </div>
+    <div class="scroll" id="watchlist"><div class="empty">Loading…</div></div>
   </div>
 
-  <!-- ledger -->
-  <section class="section">
-    <div class="lhead">
-      <div><p class="eyebrow" style="margin:0">The ledger</p>
-        <p class="sub" style="margin:2px 0 0">Every bet you place, settled against results.</p></div>
-      <div class="totals" id="totals"></div>
+  <!-- chart -->
+  <div class="col">
+    <div class="symhead" id="symhead"><h2 class="dim">Select a market</h2></div>
+    <div class="chartbox">
+      <svg id="chart" preserveAspectRatio="none"></svg>
+      <div class="chart-empty" id="chartEmpty">No market selected.</div>
     </div>
-    <div class="card ledger">
-      <svg class="pnlcurve" id="curve" preserveAspectRatio="none"></svg>
-      <div id="entries"><div class="empty">No bets logged yet. Place one from the board above, then “Settle” once games finish.</div></div>
-    </div>
-    <div style="margin-top:12px"><button class="minor" id="settle">Settle results</button></div>
-  </section>
-
-  <div class="panels">
-    <div class="card pad">
-      <p class="eyebrow">Validation gate</p>
-      <div id="gatepanel"><div class="empty">…</div></div>
-      <p class="note">Don't stake real money until <b>mean CLV is positive</b> — proof the model beats the closing line.</p>
-    </div>
-    <div class="card pad">
-      <p class="eyebrow">Data log</p>
-      <div id="logpanel"><div class="empty">…</div></div>
-      <div style="margin-top:14px"><button class="minor" id="snap">📸 Snapshot now</button></div>
-    </div>
+    <div class="readout" id="readout"></div>
   </div>
-</main>
+
+  <!-- ticket + positions -->
+  <div class="col right scroll">
+    <div class="ph">Order ticket</div>
+    <div class="ticket" id="ticket"><div class="empty">Pick a market from the watchlist.</div></div>
+    <div class="ph">Bet slip / parlay</div>
+    <div class="slip" id="slip"><div class="empty">Add legs to build a parlay.</div></div>
+    <div class="ph">Positions</div>
+    <div class="pos" id="positions"><div class="empty">No bets yet.</div></div>
+  </div>
+</div>
+
+<div class="foot">
+  <span>Gate: <b id="fGate">—</b></span>
+  <span>Brier <b id="fBrier">—</b></span>
+  <span>Snapshots <b id="fRows">—</b></span>
+  <span>Markets <b id="fMkts">—</b></span>
+  <span>Last <b id="fLast">—</b></span>
+  <span class="grow"></span>
+  <button class="mini" id="settle">Settle results</button>
+  <button class="mini" id="snap">Snapshot now</button>
+</div>
 
 <script>
-const $=s=>document.querySelector(s), pc=x=>(x*100).toFixed(0);
-const state={ edges:[], slip:[], minEdge:0.03 };
-$("#today").textContent = new Date().toISOString().slice(0,10);
+const $=s=>document.querySelector(s), pct=x=>(x*100).toFixed(0);
+const S={edges:[], byId:{}, sel:null, slip:[], exec:{armed:false,kill_switch:true,mode:"dry_run"}, minEdge:0.03, sports:["soccer","mlb"]};
+const sym=t=>t.replace(/ Winner\?.*/,"").replace(/\s*\[.*?\]/,"");
+const pick=t=>{const m=t.match(/\[(.*?)\]/);return m?m[1]:"";};
+const fmtPnl=v=>v==null?"—":(v>=0?"+$":"-$")+Math.abs(v).toFixed(0);
 
-function gauge(fair, price){
-  const lo=Math.min(fair,price)*100, hi=Math.max(fair,price)*100;
-  return `<div class="bl"></div><div class="seg" style="left:${lo}%;width:${hi-lo}%"></div>
-    <div class="mk f" style="left:${fair*100}%"></div><div class="mk p" style="left:${price*100}%"></div>`;
-}
-function pickName(t){ const m=t.match(/\[(.*?)\]/); return m?m[1]:t; }
-function gameName(t){ return t.replace(/ Winner\?.*/,"").replace(/\s*\[.*?\]/,""); }
-
-function renderBest(){
-  const el=$("#bestbets");
-  if(!state.edges.length){ el.innerHTML=`<div class="empty">The board's quiet — no model–market gap above ${pc(state.minEdge)}% with live prices right now.</div>`; return; }
-  el.innerHTML = state.edges.slice(0,30).map((e,i)=>`
-    <div class="bet ${i===0?'top':''}">
-      <div class="game">${gameName(e.title)}<span class="tag">${pickName(e.title)} · ${e.sport}</span></div>
-      <div class="pick">${e.side} · ${pickName(e.title)}<small>fair .${e.fair.toFixed(2).slice(2)} · mkt .${e.price.toFixed(2).slice(2)}</small></div>
-      <div class="gauge">${gauge(e.fair, e.price)}</div>
-      <div class="edge">+${(e.edge*100).toFixed(1)}%</div>
-      <div class="stk">$${e.stake.toFixed(0)}</div>
-      <button class="add" data-i="${i}">＋</button>
-    </div>`).join("");
-  el.querySelectorAll(".add").forEach(b=> b.onclick=()=>addLeg(state.edges[+b.dataset.i]));
-}
-
-function addLeg(e){
-  if(state.slip.find(l=>l.market_id===e.market_id)) return;
-  state.slip.push({market_id:e.market_id, event_ticker:e.event_ticker, outcome:e.outcome,
-    side:e.side, price:e.price, fair_side:e.fair_side, label:pickName(e.title),
-    sport:e.sport, game:gameName(e.title)});
-  renderSlip();
-}
-function rmLeg(i){ state.slip.splice(i,1); renderSlip(); }
-
-function renderSlip(){
-  const wrap=$("#legs");
-  if(!state.slip.length){ wrap.innerHTML=`<div class="empty">Tap ＋ on a bet to add a leg.<br>Two or more legs = parlay.</div>`;
-    $("#combine").style.display="none"; $("#corr").innerHTML=""; return; }
-  wrap.innerHTML = state.slip.map((l,i)=>`<div class="leg">
-    <div><b>${l.side.toUpperCase()} · ${l.label}</b><div class="lp">${l.game} — pay .${l.price.toFixed(2).slice(2)}</div></div>
-    <span class="x" data-i="${i}">✕</span></div>`).join("");
-  wrap.querySelectorAll(".x").forEach(x=> x.onclick=()=>rmLeg(+x.dataset.i));
-  const price=state.slip.reduce((a,l)=>a*l.price,1), fair=state.slip.reduce((a,l)=>a*l.fair_side,1);
-  $("#combine").style.display="grid";
-  $("#cFair").textContent="."+fair.toFixed(2).slice(2);
-  $("#cPrice").textContent="."+price.toFixed(2).slice(2);
-  const edge=fair-price; const ce=$("#cEdge"); ce.textContent=(edge>=0?"+":"")+(edge*100).toFixed(1)+"%";
-  ce.className=edge>=0?"pos":"neg";
-  const events=state.slip.map(l=>l.event_ticker);
-  $("#corr").innerHTML = (new Set(events).size!==events.length)
-    ? `<div class="warn">⚠ Two legs are in the same game — they're correlated, so the combined edge is overstated.</div>`:"";
-  renderExec();
-}
-
-async function place(){
-  if(!state.slip.length) return;
-  const stake=parseFloat($("#stake").value)||0;
-  if(stake<=0){ $("#stake").focus(); return; }
-  const r=await fetch("/api/bets",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({legs:state.slip, stake, sport:state.slip[0].sport})});
-  const d=await r.json();
-  if(d.ok){ state.slip=[]; $("#stake").value=""; renderSlip(); loadLedger(); renderExec(); }
-}
-
-let EXEC={mode:"dry_run",kill_switch:true,armed:false};
-async function loadExec(){ try{ EXEC=await (await fetch("/api/exec/status")).json(); }catch(e){} renderExec(); }
-function renderExec(){
-  const el=$("#execrow"); if(!el) return;
-  const single=state.slip.length===1;
-  const status = EXEC.armed ? "LIVE — real orders" : `safe (${EXEC.kill_switch?'kill-switch on':'mode '+EXEC.mode})`;
-  el.innerHTML = `<span>execution: ${status}</span>
-    <button class="send ${EXEC.armed?'armed':''}" id="send" ${single?'':'disabled'}>⚡ Send to Kalshi</button>
-    ${single?'':'<span>(single-leg only)</span>'}<span class="res" id="ores"></span>`;
-  const b=$("#send"); if(b) b.onclick=sendOrder;
-}
-async function sendOrder(){
-  const stake=parseFloat($("#stake").value)||0;
-  if(state.slip.length!==1||stake<=0){ $("#stake").focus(); return; }
-  if(EXEC.armed && !confirm("This sends a REAL order to Kalshi for $"+stake+". Continue?")) return;
-  const r=await fetch("/api/order",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({leg:state.slip[0], stake})});
-  const d=await r.json();
-  const o=d.would_place||d.order;
-  $("#ores").innerHTML = d.status==="placed" ? `<span class="pos">✔ placed: ${o.count} @ ${o.price_cents}¢</span>`
-    : d.status==="simulated" ? `simulated (${d.reason}): would buy ${o?o.count:'?'} @ ${o?o.price_cents:'?'}¢`
-    : `<span class="neg">⚠ ${d.reason||d.status}</span>`;
-}
-
-function stamp(s){ return `<span class="stamp ${s}">${s==='won'?'✔ Won':s==='lost'?'✘ Lost':'• Pending'}</span>`; }
-
-function renderLedger(d){
-  const t=d.summary, T=$("#totals");
-  const fmt=(v,suf="")=> v==null?"—":(v>=0?"+":"")+v+suf;
-  T.innerHTML = `
-    <div><span>P&L</span><b class="${t.pnl>=0?'pos':'neg'}">${t.pnl==null?'—':'$'+t.pnl.toFixed(0)}</b></div>
-    <div><span>ROI</span><b>${t.roi==null?'—':(t.roi*100).toFixed(1)+'%'}</b></div>
-    <div><span>Win rate</span><b>${t.win_rate==null?'—':(t.win_rate*100).toFixed(0)+'%'}</b></div>
-    <div><span>Mean CLV</span><b class="${(t.mean_clv||0)>=0?'pos':'neg'}">${t.mean_clv==null?'—':fmt(+(t.mean_clv*100).toFixed(1),'%')}</b></div>`;
-  drawCurve(t.curve||[]);
-  const E=$("#entries");
-  if(!d.bets.length){ E.innerHTML=`<div class="empty">No bets logged yet. Place one from the board above, then “Settle” once games finish.</div>`; return; }
-  E.innerHTML = d.bets.map(b=>`<div class="entry">
-    <div class="when">${(b.placed_ts||'').replace('T',' ').slice(5,16)}<br>${b.kind}</div>
-    <div class="desc">${b.description}<small>stake $${b.stake.toFixed(0)} · model .${(b.fair_prob||0).toFixed(2).slice(2)} · cost .${(b.entry_price||0).toFixed(2).slice(2)}</small></div>
-    <div>${stamp(b.status)}</div>
-    <div class="amt ${ (b.pnl||0)>=0?'pos':'neg'}">${b.pnl==null?'—':(b.pnl>=0?'+':'')+'$'+b.pnl.toFixed(0)}</div>
+/* ---------- watchlist ---------- */
+function renderWatch(){
+  const el=$("#watchlist");
+  const list=S.edges.filter(e=>S.sports.includes(e.sport)&&e.edge>=S.minEdge);
+  $("#wlcount").textContent=list.length;
+  if(!list.length){ el.innerHTML=`<div class="empty">No edges above ${pct(S.minEdge)}%.<br>Lower the filter or wait for liquidity.</div>`; return; }
+  el.innerHTML=list.map(e=>`<div class="wl ${e.market_id===S.sel?'sel':''}" data-id="${e.market_id}">
+    <div class="sym">${sym(e.title)}</div>
+    <div class="px">${e.price.toFixed(2)}</div>
+    <div class="eg ${e.edge>=0?'up':'down'}">+${(e.edge*100).toFixed(1)}%</div>
+    <div class="meta">${pick(e.title)} · ${e.sport}</div>
+    <div></div><div><span class="side ${e.side}">${e.side.toUpperCase()}</span></div>
   </div>`).join("");
+  el.querySelectorAll(".wl").forEach(r=>r.onclick=()=>select(r.dataset.id));
 }
 
-function drawCurve(curve){
-  const svg=$("#curve"); const W=600,H=70,p=4;
-  if(curve.length<2){ svg.innerHTML=`<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="var(--rule)"/>`; svg.setAttribute("viewBox",`0 0 ${W} ${H}`); return; }
-  const ys=[0,...curve]; const min=Math.min(...ys),max=Math.max(...ys),rng=(max-min)||1;
-  const pts=ys.map((v,i)=>`${p+i*(W-2*p)/(ys.length-1)},${H-p-((v-min)/rng)*(H-2*p)}`).join(" ");
-  const zeroY=H-p-((0-min)/rng)*(H-2*p);
-  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
-  svg.innerHTML=`<line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="var(--rule)" stroke-dasharray="3 3"/>
-    <polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2"/>`;
+/* ---------- selection + chart ---------- */
+async function select(id){
+  S.sel=id; renderWatch();
+  const e=S.byId[id]; if(!e) return;
+  $("#symhead").innerHTML=`<h2>${sym(e.title)}</h2>
+    <span class="last ${e.side=='yes'?'up':'down'}">${e.price.toFixed(2)}</span>
+    <span class="eg ${e.edge>=0?'up':'down'}">+${(e.edge*100).toFixed(1)}% edge</span>
+    <span class="dim">${e.side.toUpperCase()} · ${pick(e.title)}</span>
+    <span class="legend"><span><i style="background:#d1d4dc"></i>market</span>
+      <span><i style="background:#f0b90b"></i>model fair</span></span>`;
+  renderReadout(e); renderTicket(e);
+  const r=await fetch("/api/history?market_id="+encodeURIComponent(id));
+  const d=await r.json(); drawChart(d.points||[], e);
 }
+function renderReadout(e){
+  $("#readout").innerHTML=`
+    <div class="r"><div class="k">Model fair</div><div class="v">${e.fair.toFixed(2)}</div></div>
+    <div class="r"><div class="k">Market</div><div class="v">${e.price.toFixed(2)}</div></div>
+    <div class="r"><div class="k">Edge</div><div class="v ${e.edge>=0?'up':'down'}">+${(e.edge*100).toFixed(1)}%</div></div>
+    <div class="r"><div class="k">Suggested</div><div class="v">$${e.stake.toFixed(0)}</div></div>`;
+}
+function drawChart(points, e){
+  const svg=$("#chart"), empty=$("#chartEmpty");
+  const mids=points.map(p=>p.mid).filter(v=>v!=null);
+  if(mids.length<2){ svg.innerHTML=""; empty.style.display="grid";
+    empty.textContent=points.length?"History building… (snapshots accumulating)":"No history yet for this market."; return; }
+  empty.style.display="none";
+  const W=900,H=360,pl=42,pr=54,pt=14,pb=24;
+  const fairs=points.map(p=>p.fair).filter(v=>v!=null);
+  let lo=Math.min(...mids,...(fairs.length?fairs:mids)), hi=Math.max(...mids,...(fairs.length?fairs:mids));
+  const pad=(hi-lo)*0.18||0.05; lo=Math.max(0,lo-pad); hi=Math.min(1,hi+pad);
+  const X=i=>pl+i*(W-pl-pr)/(points.length-1);
+  const Y=v=>pt+(1-(v-lo)/(hi-lo))*(H-pt-pb);
+  const line=(key,color,dash)=>{
+    let d="",started=false;
+    points.forEach((p,i)=>{ if(p[key]==null)return; d+=(started?"L":"M")+X(i)+","+Y(p[key]); started=true; });
+    return d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" ${dash?'stroke-dasharray="5 4"':''}/>`:"";
+  };
+  let grid="";
+  for(let g=0;g<=4;g++){ const v=lo+(hi-lo)*g/4, y=Y(v);
+    grid+=`<line x1="${pl}" y1="${y}" x2="${W-pr}" y2="${y}" stroke="#272c38"/>
+      <text x="${W-pr+6}" y="${y+3}" fill="#787b86" font-size="10" font-family="Roboto Mono">${(v*100).toFixed(0)}</text>`; }
+  const last=mids[mids.length-1], lastY=Y(last);
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.innerHTML=grid+line("mid","#d1d4dc",false)+line("fair","#f0b90b",true)+
+    `<line x1="${pl}" y1="${lastY}" x2="${W-pr}" y2="${lastY}" stroke="${e.side=='yes'?'#26a69a':'#ef5350'}" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>
+     <rect x="${W-pr}" y="${lastY-9}" width="${pr}" height="18" fill="${e.side=='yes'?'#26a69a':'#ef5350'}"/>
+     <text x="${W-pr+6}" y="${lastY+4}" fill="#04140e" font-size="11" font-weight="700" font-family="Roboto Mono">${last.toFixed(2)}</text>`;
+}
+
+/* ---------- ticket ---------- */
+function legFrom(e){ return {market_id:e.market_id,event_ticker:e.event_ticker,outcome:e.outcome,
+  side:e.side,price:e.price,fair_side:e.fair_side,label:pick(e.title),sport:e.sport,game:sym(e.title)}; }
+function renderTicket(e){
+  $("#ticket").innerHTML=`
+    <div class="row">
+      <div class="sidebtn yes ${e.side=='yes'?'on':''}">YES</div>
+      <div class="sidebtn no ${e.side=='no'?'on':''}">NO</div>
+    </div>
+    <div class="row"><div class="field"><label>Limit price</label><input class="mono" value="${e.price.toFixed(2)}" readonly></div>
+      <div class="field"><label>Stake $</label><input class="mono" id="stake" type="number" placeholder="${e.stake.toFixed(0)}"></div></div>
+    <button class="btn log" id="logbet">Log to ledger</button>
+    <button class="btn add" id="addleg">＋ Add to parlay</button>
+    <button class="btn send" id="send" ${S.exec.armed?'':'disabled'}>⚡ Send to Kalshi</button>
+    <div class="execnote">execution: ${S.exec.armed?'LIVE — real orders':'safe ('+(S.exec.kill_switch?'kill-switch on':'mode '+S.exec.mode)+')'}</div>
+    <div class="ores" id="ores"></div>`;
+  $("#logbet").onclick=()=>placeBet([legFrom(e)]);
+  $("#addleg").onclick=()=>{ if(!S.slip.find(l=>l.market_id===e.market_id)){S.slip.push(legFrom(e));renderSlip();} };
+  const sd=$("#send"); if(sd) sd.onclick=()=>sendOrder(e);
+}
+async function placeBet(legs){
+  const stake=parseFloat($("#stake").value)||S.byId[S.sel].stake;
+  const r=await fetch("/api/bets",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({legs,stake,sport:legs[0].sport})});
+  if((await r.json()).ok){ loadLedger(); $("#ores").innerHTML='<span class="up">✔ logged to ledger</span>'; }
+}
+async function sendOrder(e){
+  const stake=parseFloat($("#stake").value)||e.stake;
+  if(S.exec.armed && !confirm("Send a REAL order to Kalshi for $"+stake+"?")) return;
+  const r=await fetch("/api/order",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({leg:legFrom(e),stake})});
+  const d=await r.json(); const o=d.would_place||d.order;
+  $("#ores").innerHTML=d.status=="placed"?`<span class="up">✔ placed ${o.count} @ ${o.price_cents}¢</span>`
+    :d.status=="simulated"?`<span class="dim">simulated (${d.reason}): ${o?o.count+' @ '+o.price_cents+'¢':''}</span>`
+    :`<span class="down">⚠ ${d.reason||d.status}</span>`;
+}
+
+/* ---------- parlay slip ---------- */
+function renderSlip(){
+  const el=$("#slip");
+  if(!S.slip.length){ el.innerHTML=`<div class="empty">Add legs to build a parlay.</div>`; return; }
+  const price=S.slip.reduce((a,l)=>a*l.price,1), fair=S.slip.reduce((a,l)=>a*l.fair_side,1);
+  const corr=new Set(S.slip.map(l=>l.event_ticker)).size!==S.slip.length;
+  el.innerHTML=S.slip.map((l,i)=>`<div class="leg"><span>${l.side.toUpperCase()} ${l.label}</span>
+    <span class="dim mono">.${l.price.toFixed(2).slice(2)}</span><span class="x" data-i="${i}">✕</span></div>`).join("")
+    +`<div class="comb"><span class="dim">combined</span><span>fair .${fair.toFixed(2).slice(2)} · cost .${price.toFixed(2).slice(2)} · <b class="${fair-price>=0?'up':'down'}">+${((fair-price)*100).toFixed(1)}%</b></span></div>`
+    +(corr?`<div class="down mono" style="font-size:10px;margin-top:6px">⚠ legs share a game — correlated</div>`:"")
+    +`<div class="row" style="margin-top:10px"><input class="mono" id="pstake" type="number" placeholder="stake $" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:7px">
+      <button class="btn log" style="flex:1;margin:0" id="pplace">Log parlay</button></div>`;
+  el.querySelectorAll(".x").forEach(x=>x.onclick=()=>{S.slip.splice(+x.dataset.i,1);renderSlip();});
+  $("#pplace").onclick=async()=>{ const stake=parseFloat($("#pstake").value)||0; if(stake<=0)return;
+    const r=await fetch("/api/bets",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({legs:S.slip,stake,sport:S.slip[0].sport})});
+    if((await r.json()).ok){ S.slip=[]; renderSlip(); loadLedger(); } };
+}
+
+/* ---------- positions / ledger ---------- */
+async function loadLedger(){
+  const d=await (await fetch("/api/bets")).json(); const t=d.summary;
+  $("#topPnl").textContent=fmtPnl(t.pnl); $("#topPnl").className="v mono "+((t.pnl||0)>=0?'up':'down');
+  $("#topClv").textContent=t.mean_clv==null?"—":((t.mean_clv*100>=0?'+':'')+(t.mean_clv*100).toFixed(2)+'%');
+  $("#topClv").className="v mono "+((t.mean_clv||0)>=0?'up':'down');
+  const pos=$("#positions");
+  let html=`<div class="sumrow">
+    <div><div class="k">P&L</div><div class="v ${(t.pnl||0)>=0?'up':'down'}">${fmtPnl(t.pnl)}</div></div>
+    <div><div class="k">ROI</div><div class="v">${t.roi==null?'—':(t.roi*100).toFixed(0)+'%'}</div></div>
+    <div><div class="k">Win</div><div class="v">${t.win_rate==null?'—':(t.win_rate*100).toFixed(0)+'%'}</div></div>
+    <div><div class="k">CLV</div><div class="v ${(t.mean_clv||0)>=0?'up':'down'}">${t.mean_clv==null?'—':(t.mean_clv*100).toFixed(1)+'%'}</div></div></div>`;
+  html+= d.bets.length? d.bets.slice(0,12).map(b=>`<div class="bet"><span class="st ${b.status}"></span>
+    <span>${b.description}</span><span class="amt ${(b.pnl||0)>=0?'up':'down'}">${b.pnl==null?'·':fmtPnl(b.pnl)}</span></div>`).join("")
+    : `<div class="empty">No bets logged yet.</div>`;
+  pos.innerHTML=html;
+}
+
+/* ---------- top/foot status ---------- */
+async function loadGate(){
+  const d=await (await fetch("/api/backtest?min_edge="+S.minEdge)).json();
+  $("#gate").className="badge "+(d.passes?"valid":"unvalid"); $("#gate").textContent=d.passes?"✔ Validated":"▲ Unvalidated";
+  $("#fGate").textContent=d.n?(d.passes?"PASS":"not yet"):"no data";
+  $("#fBrier").textContent=d.brier==null?"—":d.brier;
+}
+async function loadFoot(){
+  const d=await (await fetch("/api/stats")).json();
+  $("#fRows").textContent=(d.rows||0).toLocaleString(); $("#fMkts").textContent=d.markets||0;
+  $("#fLast").textContent=d.last?d.last.replace('T',' ').slice(5,16):"—";
+}
+async function loadAccount(){ const d=await (await fetch("/api/account")).json();
+  $("#bal").textContent=d.ok&&d.balance!=null?"$"+Number(d.balance).toFixed(2):"—"; }
+async function loadExec(){ try{S.exec=await (await fetch("/api/exec/status")).json();}catch(e){} if(S.sel&&S.byId[S.sel])renderTicket(S.byId[S.sel]); }
+
+function setEdges(edges){ S.edges=edges; S.byId={}; edges.forEach(e=>S.byId[e.market_id]=e);
+  renderWatch(); if(!S.sel && edges.length) select(edges[0].market_id);
+  else if(S.sel && S.byId[S.sel]){ renderReadout(S.byId[S.sel]); } }
 
 async function loadEdges(){
-  try{
-    const r=await fetch("/api/edges?sports=soccer,mlb&min_edge="+state.minEdge);
-    const d=await r.json();
-    $("#errbox").innerHTML=(d.errors||[]).map(e=>`<div>⚠ ${e}</div>`).join("");
-    state.edges=d.edges||[]; renderBest();
-    if(state.edges[0]) $("#stake").placeholder="stake $ (sugg "+state.edges[0].stake.toFixed(0)+")";
-  }catch(err){ $("#errbox").innerHTML=`<div>⚠ ${err}</div>`; }
-}
-async function loadLedger(){ const r=await fetch("/api/bets"); renderLedger(await r.json()); }
-async function loadGate(){
-  const d=await (await fetch("/api/backtest?min_edge="+state.minEdge)).json();
-  $("#gatestamp").innerHTML = d.passes? `<span class="stamp won">✔ Validated</span>`:`<span class="stamp unvalid">▲ Unvalidated</span>`;
-  const p=$("#gatepanel");
-  if(!d.n){ p.innerHTML=`<div class="empty">No settled bets scored yet. Collecting as games finish.</div>`; return; }
-  p.innerHTML=`<div class="stat"><span class="k">Bets scored</span><span class="v">${d.n}</span></div>
-    <div class="stat"><span class="k">Brier (↓ better)</span><span class="v ${d.brier<.25?'pos':'neg'}">${d.brier}</span></div>
-    <div class="stat"><span class="k">Mean CLV</span><span class="v ${d.clv>=0?'pos':'neg'}">${(d.clv*100>=0?'+':'')+(d.clv*100).toFixed(2)}%</span></div>`;
-}
-async function loadLog(){
-  const d=await (await fetch("/api/stats")).json();
-  $("#logpanel").innerHTML=`<div class="stat"><span class="k">Snapshot rows</span><span class="v">${(d.rows||0).toLocaleString()}</span></div>
-    <div class="stat"><span class="k">Markets tracked</span><span class="v">${(d.markets||0).toLocaleString()}</span></div>
-    <div class="stat"><span class="k">Settled markets</span><span class="v">${(d.settled||0).toLocaleString()}</span></div>
-    <div class="stat"><span class="k">Last snapshot</span><span class="v" style="font-size:12px">${d.last?d.last.replace('T',' ').slice(0,16):'—'}</span></div>`;
+  try{ const d=await (await fetch("/api/edges?sports=soccer,mlb&min_edge="+S.minEdge)).json();
+    setEdges(d.edges||[]); }catch(e){}
 }
 
-$("#place").onclick=place;
-$("#settle").onclick=async()=>{ await fetch("/api/bets/settle",{method:"POST"}); loadLedger(); loadGate(); };
-$("#snap").onclick=async e=>{ e.target.textContent="📸 …"; const d=await(await fetch("/api/snapshot",{method:"POST"})).json();
-  e.target.textContent=d.ok?`✔ ${d.rows} rows`:"⚠ failed"; setTimeout(()=>e.target.textContent="📸 Snapshot now",2500); loadLog(); };
-
-// --- real-time feed (falls back to the REST load above if ws is down) ---
+/* ---------- live ---------- */
 function connectWS(){
-  let proto = location.protocol==="https:"?"wss":"ws";
-  let ws;
-  try{ ws = new WebSocket(`${proto}://${location.host}/ws`); }catch(e){ return; }
-  ws.onmessage = ev=>{
-    const d = JSON.parse(ev.data);
-    const pill = $("#livepill");
-    if(d.live){
-      state.edges = (d.edges||[]).filter(e=>e.edge>=state.minEdge);
-      renderBest();
-      pill.className="livepill on";
-      pill.textContent = "● live · ws"+(d.last_update?" · "+new Date(d.last_update*1000).toLocaleTimeString():"");
-    } else {
-      pill.className="livepill off";
-      pill.textContent = "● offline · REST";
-    }
-  };
-  ws.onclose = ()=>{ $("#livepill").className="livepill off"; $("#livepill").textContent="● offline · REST";
-    setTimeout(connectWS, 4000); };
-  ws.onerror = ()=>{ try{ws.close();}catch(e){} };
+  let ws; try{ ws=new WebSocket((location.protocol=="https:"?"wss":"ws")+"://"+location.host+"/ws"); }catch(e){return;}
+  ws.onmessage=ev=>{ const d=JSON.parse(ev.data); const p=$("#pill");
+    if(d.live){ p.className="pill live"; p.innerHTML='<span class="dot"></span>live · ws';
+      setEdges((d.edges||[]).filter(e=>e.edge>=S.minEdge)); }
+    else{ p.className="pill"; p.innerHTML='<span class="dot"></span>offline · REST'; } };
+  ws.onclose=()=>{ $("#pill").className="pill"; $("#pill").innerHTML='<span class="dot"></span>offline · REST'; setTimeout(connectWS,4000); };
+  ws.onerror=()=>{try{ws.close();}catch(e){}};
 }
 
-loadEdges(); loadLedger(); loadGate(); loadLog(); loadExec();
-connectWS();
+document.querySelectorAll(".filters .chip").forEach(c=>c.onclick=()=>{c.classList.toggle("on");
+  S.sports=[...document.querySelectorAll(".filters .chip.on")].map(x=>x.dataset.s); renderWatch();});
+$("#minedge").oninput=e=>{S.minEdge=e.target.value/100;$("#minlbl").textContent=e.target.value+"%";renderWatch();};
+$("#minedge").onchange=()=>{loadEdges();loadGate();};
+$("#settle").onclick=async()=>{await fetch("/api/bets/settle",{method:"POST"});loadLedger();loadGate();};
+$("#snap").onclick=async e=>{e.target.textContent="…";const d=await(await fetch("/api/snapshot",{method:"POST"})).json();
+  e.target.textContent=d.ok?`✔ ${d.rows}`:"⚠";setTimeout(()=>e.target.textContent="Snapshot now",2500);loadFoot();};
+
+loadEdges();loadLedger();loadGate();loadFoot();loadAccount();loadExec();connectWS();
+setInterval(loadAccount, 60000);
 </script>
 </body>
 </html>
