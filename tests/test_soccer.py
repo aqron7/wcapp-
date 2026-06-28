@@ -38,12 +38,20 @@ def test_soccer_predictions_cover_all_three_outcomes():
     assert abs(sum(p.fair_prob for p in preds) - 1.0) < 1e-9
 
 
-def test_soccer_value_edge_found_and_deduped():
+def test_soccer_value_edge_found_pure_model():
+    # model_weight=1.0 tests the raw mechanism (no market regression).
     quotes = _soccer_quotes()
     preds = soccer_predictions(quotes, SoccerModel())
-    ideas = find_value_edges(quotes, preds, Config())
-    # Model rates Curacao stronger than the market implies; Germany at 0.93/0.94
-    # is richer than model fair (~0.85) -> one bet per game after dedup.
+    ideas = find_value_edges(quotes, preds, Config(), model_weight=1.0)
     assert len(ideas) == 1
     assert ideas[0].edge > 0.03
     assert ideas[0].side in (Side.YES, Side.NO)
+
+
+def test_market_blend_suppresses_favorite_fade():
+    # The Germany-at-0.93 fade is pure model under-confidence. With the default
+    # market-regressed fair value, it should NOT be flagged as an edge.
+    quotes = _soccer_quotes()
+    preds = soccer_predictions(quotes, SoccerModel())
+    ideas = find_value_edges(quotes, preds, Config())  # default model_weight 0.5
+    assert all("Germany" not in i.title for i in ideas)

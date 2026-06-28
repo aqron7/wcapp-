@@ -27,6 +27,7 @@ class SizingConfig:
 class EdgeConfig:
     min_edge: float = 0.03
     kalshi_fee: float = 0.01
+    model_weight: float = 0.5   # fair = w*model + (1-w)*market_prior; lower = trust market more
 
 
 @dataclass

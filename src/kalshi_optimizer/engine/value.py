@@ -145,13 +145,20 @@ def find_value_edges(
     predictions: list[Prediction],
     config: Config,
     market_probs: dict[tuple[str, str], float] | None = None,
-    model_weight: float = 0.6,
+    model_weight: float | None = None,
 ) -> list[TradeIdea]:
     """Return ranked, sized TradeIdeas where the model beats the Kalshi price.
 
-    ``market_probs`` optionally maps (event_key, team_token) -> a free market
-    probability (Polymarket / Odds API) to blend into fair value.
+    Fair value regresses the model toward the **market price as a prior** (the
+    market is sharp; an unvalidated model shouldn't be trusted outright). With
+    ``model_weight`` w, fair = w*model + (1-w)*market_mid, so only strong
+    disagreements survive — this prevents the model's systematic under-confidence
+    on favorites from spamming "fade the favorite" picks. ``model_weight``
+    defaults to config.edge.model_weight. ``market_probs`` can override the
+    market prior per outcome (e.g. a sharper external source).
     """
+    if model_weight is None:
+        model_weight = getattr(config.edge, "model_weight", 0.5)
     pred_index = {(p.event_key, p.outcome): p.fair_prob for p in predictions}
     market_probs = market_probs or {}
 
@@ -165,7 +172,11 @@ def find_value_edges(
         if model_p is None:
             continue
 
-        fair = blend(model_p, market_probs.get((q.event_key, q.outcome)), model_weight)
+        # Market prior: an explicit source if given, else this market's own mid.
+        market_prior = market_probs.get((q.event_key, q.outcome))
+        if market_prior is None:
+            market_prior = q.yes_mid
+        fair = blend(model_p, market_prior, model_weight)
         side, entry, edge = evaluate_market(fair, q.yes_bid, q.yes_ask, config.edge.kalshi_fee)
         if edge < config.edge.min_edge:
             continue
