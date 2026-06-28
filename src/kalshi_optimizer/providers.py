@@ -24,7 +24,7 @@ def _gemini(prompt: str, system: str | None, key: str) -> str:
            f"gemini-2.0-flash:generateContent?key={key}")
     text = f"{system}\n\n{prompt}" if system else prompt
     body = {"contents": [{"parts": [{"text": text}]}],
-            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 500}}
+            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1200}}
     r = requests.post(url, json=body, timeout=30)
     r.raise_for_status()
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]
@@ -53,11 +53,21 @@ def _openai(prompt: str, system: str | None, key: str) -> str:
 
 
 def llm_complete(prompt: str, system: str | None, secrets) -> str:
+    import time
+
     name = provider_name(secrets)
-    if name == "gemini":
-        return _gemini(prompt, system, secrets.gemini_api_key)
-    if name == "anthropic":
-        return _anthropic(prompt, system, secrets.anthropic_api_key)
-    if name == "openai":
-        return _openai(prompt, system, secrets.openai_api_key)
-    raise RuntimeError("No LLM API key set (GEMINI_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY)")
+    fns = {"gemini": (_gemini, getattr(secrets, "gemini_api_key", "")),
+           "anthropic": (_anthropic, getattr(secrets, "anthropic_api_key", "")),
+           "openai": (_openai, getattr(secrets, "openai_api_key", ""))}
+    if name not in fns:
+        raise RuntimeError("No LLM API key set (GEMINI_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY)")
+    fn, key = fns[name]
+    for attempt in range(3):
+        try:
+            return fn(prompt, system, key)
+        except requests.HTTPError as exc:
+            code = exc.response.status_code if exc.response is not None else 0
+            if code in (429, 503) and attempt < 2:
+                time.sleep(6 * (attempt + 1))   # rate-limit backoff
+                continue
+            raise

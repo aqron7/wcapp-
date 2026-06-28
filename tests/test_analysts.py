@@ -14,6 +14,18 @@ def test_parse_pick_valid_and_invalid():
     assert analysts.parse_pick('{"market_id":null}', valid) is None
 
 
+def test_parse_batch_array():
+    valid = {"E-A", "E-B"}
+    text = ('noise [{"market_id":"E-A","side":"yes","confidence":0.6,"rationale":"r1"},'
+            '{"market_id":"E-Z","side":"no"},'
+            '{"market_id":"E-B","side":"no","confidence":0.9,"rationale":"r2"}] trailing')
+    picks = analysts.parse_batch(text, valid)
+    assert [p["market_id"] for p in picks] == ["E-A", "E-B"]   # bogus id dropped
+    assert picks[1]["side"] == "no" and picks[1]["confidence"] == 0.9
+    # no array -> empty
+    assert analysts.parse_batch("no json", valid) == []
+
+
 def test_build_packets_groups_and_filters():
     quotes = [
         MarketQuote("kalshi", "KXWCGAME-G-ESP", "Spain vs Austria Winner?", 0.5, 0.52,

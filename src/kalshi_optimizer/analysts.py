@@ -77,6 +77,43 @@ def build_prompt(persona_desc: str, packet: dict) -> str:
     )
 
 
+def build_batch_prompt(persona_desc: str, packets: list[dict]) -> str:
+    """One prompt covering all games for a persona (keeps LLM calls to 1/persona)."""
+    blocks = []
+    for pk in packets:
+        lines = "\n".join(f"  - {m['market_id']} | {m['desc']} | price {m['price']} | model_fair {m['fair']}"
+                          for m in pk["markets"][:8])
+        blocks.append(f"GAME {pk['game_key']}: {pk['label']} ({pk['sport']})\n{lines}")
+    return (
+        f"You are {persona_desc}\n"
+        "Below are today's games and the bets available for each (id | description | "
+        "price | model_fair).\n\n" + "\n\n".join(blocks) + "\n\n"
+        "For each game pick AT MOST ONE bet that fits your perspective, or skip it. "
+        '"side" is "yes" to back the listed outcome, "no" to bet against it.\n'
+        'Reply ONLY with a JSON array, one object per pick: '
+        '[{"market_id":"<id>","side":"yes","confidence":0.0-1.0,"rationale":"one sentence"}]. '
+        "Use market_id values exactly as listed; include only games you have a pick for."
+    )
+
+
+def parse_batch(text: str, valid_ids: set[str]) -> list[dict]:
+    m = re.search(r"\[.*\]", text, re.DOTALL)
+    if not m:
+        return []
+    try:
+        arr = json.loads(m.group(0))
+    except ValueError:
+        return []
+    out = []
+    for d in arr if isinstance(arr, list) else []:
+        if not isinstance(d, dict):
+            continue
+        one = parse_pick(json.dumps(d), valid_ids)
+        if one:
+            out.append(one)
+    return out
+
+
 def parse_pick(text: str, valid_ids: set[str]) -> dict | None:
     m = re.search(r"\{.*\}", text, re.DOTALL)
     if not m:
@@ -140,28 +177,28 @@ def generate_takes(quotes: list[MarketQuote], sport: str, secrets,
                    personas: list[str] | None = None, max_games: int = 8) -> list[dict]:
     """Call the LLM for each persona on each game; return logged-pick dicts."""
     packets = list(build_packets(quotes, sport).values())[:max_games]
+    if not packets:
+        return []
     chosen = personas or list(PERSONAS)
+    # market_id -> (packet, yes_mid) so one batched response maps back to games.
+    meta = {m["market_id"]: (pk, m["price"]) for pk in packets for m in pk["markets"]}
+    valid = set(meta)
     ts = datetime.now(timezone.utc).isoformat()
     date = ts[:10]
     out: list[dict] = []
-    for packet in packets:
-        valid = {m["market_id"] for m in packet["markets"]}
-        price_by_id = {m["market_id"]: m["price"] for m in packet["markets"]}
-        for persona in chosen:
-            try:
-                text = llm_complete(build_prompt(PERSONAS[persona], packet),
-                                    system="You are a sharp sports betting analyst.", secrets=secrets)
-            except Exception:  # noqa: BLE001
-                continue
-            pick = parse_pick(text, valid)
-            if not pick:
-                continue
-            yes_mid = price_by_id[pick["market_id"]]
+    for persona in chosen:   # one LLM call per persona (free-tier friendly)
+        try:
+            text = llm_complete(build_batch_prompt(PERSONAS[persona], packets),
+                                system="You are a sharp sports betting analyst.", secrets=secrets)
+        except Exception:  # noqa: BLE001
+            continue
+        for pick in parse_batch(text, valid):
+            pk, yes_mid = meta[pick["market_id"]]
             entry = yes_mid if pick["side"] == "yes" else round(1 - yes_mid, 2)
             out.append({"ts": ts, "date": date, "sport": sport, "analyst": persona,
-                        "game_key": packet["game_key"], "game_label": packet["label"],
+                        "game_key": pk["game_key"], "game_label": pk["label"],
                         "market_id": pick["market_id"], "side": pick["side"],
                         "price": entry, "confidence": pick["confidence"],
                         "rationale": pick["rationale"]})
-            time.sleep(0.2)  # be gentle with free-tier rate limits
+        time.sleep(1.0)   # ~1 call/persona/sec stays under free-tier limits
     return out
