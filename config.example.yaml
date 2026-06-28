@@ -22,6 +22,8 @@ edge:
   model_sharpen: 1.25     # >1 corrects model under-confidence so edges are two-sided.
                           # Ideally fit from settled results; tune down toward 1.0 if
                           # the model starts over-betting longshots.
+  min_price: 0.05         # skip near-decided markets (<=5c or >=95c) so the board never
+                          # surfaces 0-chance picks. Ended games are also dropped by time.
 
 arbitrage:
   min_profit: 0.01        # min guaranteed profit fraction to flag an arb

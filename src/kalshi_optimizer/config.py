@@ -30,6 +30,7 @@ class EdgeConfig:
     model_weight: float = 0.5   # fair = w*model + (1-w)*market_prior; lower = trust market more
     devig: bool = True          # remove the market's overround before comparing
     model_sharpen: float = 1.25  # >1 fixes model under-confidence; fit from results later
+    min_price: float = 0.05     # skip near-decided markets (<=5c or >=95c) — no 0-chance picks
 
 
 @dataclass

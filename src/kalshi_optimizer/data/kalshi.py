@@ -92,9 +92,24 @@ def parse_markets(payload: dict, sport: str, market_type: str = "winner") -> lis
                 outcome_label=m.get("yes_sub_title"),
                 market_type=market_type,
                 strike=float(strike) if strike is not None else None,
+                game_time=(m.get("expected_expiration_time") or m.get("occurrence_datetime")
+                           or m.get("close_time")),
             )
         )
     return quotes
+
+
+def is_ended(game_time_iso: str | None, now=None, hours: float = 6.0) -> bool:
+    """True if the game finished more than ``hours`` ago (so it's not live)."""
+    if not game_time_iso:
+        return False
+    from datetime import datetime, timedelta, timezone
+    try:
+        dt = datetime.fromisoformat(game_time_iso.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    now = now or datetime.now(timezone.utc)
+    return dt < now - timedelta(hours=hours)
 
 
 class KalshiClient:
@@ -185,7 +200,8 @@ class KalshiClient:
                 if cursor:
                     params["cursor"] = cursor
                 payload = self._get("/markets", params=params)
-                out.extend(parse_markets(payload, sport, mtype))
+                out.extend(q for q in parse_markets(payload, sport, mtype)
+                           if not is_ended(q.game_time))   # live games only
                 cursor = payload.get("cursor")
                 if not cursor:
                     break
