@@ -28,6 +28,7 @@ class MarketQuote:
     event_key: str | None = None   # groups markets of the same game (Kalshi: event_ticker)
     outcome: str | None = None     # outcome code, e.g. "SEA", "AUS", "TIE"
     outcome_label: str | None = None   # human label, e.g. "Seattle", "Reg Time: Tie"
+    market_type: str | None = None     # "winner" | "total" | "spread" | "btts" | "prop"
     close_time: datetime | None = None
 
     @property

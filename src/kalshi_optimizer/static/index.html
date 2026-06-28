@@ -159,8 +159,8 @@
   <div class="col right scroll">
     <div class="ph">Order ticket</div>
     <div class="ticket" id="ticket"><div class="empty">Pick a market from the watchlist.</div></div>
-    <div class="ph">Bet slip / parlay</div>
-    <div class="slip" id="slip"><div class="empty">Add legs to build a parlay.</div></div>
+    <div class="ph">Bet slip / parlay<span class="grow"></span><button class="mini" id="autopar">✨ Best parlay</button></div>
+    <div class="slip" id="slip"><div class="empty">Add legs, or tap “Best parlay” for the top EV combo.</div></div>
     <div class="ph">Positions</div>
     <div class="pos" id="positions"><div class="empty">No bets yet.</div></div>
   </div>
@@ -360,6 +360,14 @@ function connectWS(){
   ws.onerror=()=>{try{ws.close();}catch(e){}};
 }
 
+$("#autopar").onclick=async()=>{
+  const d=await (await fetch("/api/parlay/optimize?max_legs=3&min_leg_edge="+S.minEdge)).json();
+  const p=(d.parlays||[])[0];
+  if(!p){ alert("No +EV parlay available right now."); return; }
+  S.slip=p.legs.map(l=>({market_id:l.market_id,event_ticker:l.event_ticker,outcome:l.outcome,
+    side:l.side,price:l.price,fair_side:l.fair_side,label:pick(l.title),sport:l.sport,game:sym(l.title)}));
+  renderSlip();
+};
 document.querySelectorAll(".filters .chip").forEach(c=>c.onclick=()=>{c.classList.toggle("on");
   S.sports=[...document.querySelectorAll(".filters .chip.on")].map(x=>x.dataset.s); renderWatch();});
 $("#minedge").oninput=e=>{S.minEdge=e.target.value/100;$("#minlbl").textContent=e.target.value+"%";renderWatch();};

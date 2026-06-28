@@ -27,12 +27,20 @@ from ..types import MarketQuote
 
 # Kalshi sports markets live under series tickers. These are sensible defaults;
 # confirm/extend against the live GET /series listing for each sport.
+# Per sport, the series we pull. Winner markets are modeled; totals/BTTS get a
+# Poisson model; spreads/props are ingested for display + tracking. Discover more
+# with: python -m kalshi_optimizer discover "<keyword>"
 SPORT_SERIES: dict[str, list[str]] = {
-    "mlb": ["KXMLBGAME"],
-    # World Cup: per-match results (KXWCGAME) drive the model/arb; outright
-    # winner (KXMENWORLDCUP) and advancement (KXWCADVANCE) are single-team
-    # futures. Discover more with: python -m kalshi_optimizer discover "world cup"
-    "soccer": ["KXWCGAME", "KXMENWORLDCUP", "KXWCADVANCE"],
+    "mlb": ["KXMLBGAME", "KXMLBTOTAL", "KXMLBSPREAD", "KXMLBKS", "KXMLBHR", "KXMLBHIT"],
+    "soccer": ["KXWCGAME", "KXWCTOTAL", "KXWCSPREAD", "KXWCBTTS"],
+}
+
+# Market type per series ticker (drives which model, if any, applies).
+SERIES_TYPE: dict[str, str] = {
+    "KXMLBGAME": "winner", "KXMLBTOTAL": "total", "KXMLBSPREAD": "spread",
+    "KXMLBKS": "prop", "KXMLBHR": "prop", "KXMLBHIT": "prop",
+    "KXWCGAME": "winner", "KXWCTOTAL": "total", "KXWCSPREAD": "spread",
+    "KXWCBTTS": "btts",
 }
 
 
@@ -48,7 +56,7 @@ def _price(raw) -> float | None:
     return val if val > 0 else None
 
 
-def parse_markets(payload: dict, sport: str) -> list[MarketQuote]:
+def parse_markets(payload: dict, sport: str, market_type: str = "winner") -> list[MarketQuote]:
     """Parse a GET /markets response body into MarketQuotes.
 
     Pure function — no network. Each game has several binary markets (one per
@@ -73,6 +81,7 @@ def parse_markets(payload: dict, sport: str) -> list[MarketQuote]:
                 event_key=event_ticker,
                 outcome=outcome,
                 outcome_label=m.get("yes_sub_title"),
+                market_type=market_type,
             )
         )
     return quotes
@@ -159,13 +168,14 @@ class KalshiClient:
         """
         out: list[MarketQuote] = []
         for series in SPORT_SERIES.get(sport, []):
+            mtype = SERIES_TYPE.get(series, "winner")
             cursor: str | None = None
             while True:
                 params = {"series_ticker": series, "status": "open", "limit": 200}
                 if cursor:
                     params["cursor"] = cursor
                 payload = self._get("/markets", params=params)
-                out.extend(parse_markets(payload, sport))
+                out.extend(parse_markets(payload, sport, mtype))
                 cursor = payload.get("cursor")
                 if not cursor:
                     break

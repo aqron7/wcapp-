@@ -194,6 +194,27 @@ def api_parlay_quote(bet: BetIn) -> dict:
     return c
 
 
+@app.get("/api/parlay/optimize")
+def api_parlay_optimize(max_legs: int = 3, min_leg_edge: float = 0.03) -> dict:
+    """Top parlays by expected ROI, built from the current single-leg edges."""
+    from .engine.optimizer import optimize_parlays
+
+    config = _config(min_leg_edge, 0.25, 1000.0)
+    if LIVE.connected and LIVE.markets:
+        edges = [_edge_dict(i, _sport_of(i.market_id)) for i in LIVE.edges(config)]
+    else:
+        kalshi = KalshiClient(config.secrets)
+        edges = []
+        for sport in ("soccer", "mlb"):
+            try:
+                quotes = kalshi.get_sports_markets(sport)
+                edges += [_edge_dict(i, sport)
+                          for i in find_value_edges(quotes, predictions_with_context(sport, quotes), config)]
+            except Exception:  # noqa: BLE001
+                pass
+    return {"parlays": optimize_parlays(edges, max_legs=max_legs, min_leg_edge=min_leg_edge)}
+
+
 @app.get("/api/bets")
 def api_bets() -> dict:
     conn = storage.connect()
