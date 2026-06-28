@@ -42,17 +42,19 @@ class SoccerModel:
     def rating_for(self, name: str) -> float:
         return self.ratings.get(name.strip().lower(), self.base)
 
-    def match_probs(self, team_a: str, team_b: str, a_advantage: float = 0.0) -> tuple[float, float, float]:
-        """Return (P(team_a win), P(draw), P(team_b win)).
+    def score_matrix(self, team_a: str, team_b: str, a_advantage: float = 0.0):
+        """Dixon-Coles score-probability matrix for the match."""
+        from . import dixon_coles as dc
 
-        Draw probability is largest for evenly matched teams and decays toward 0
-        as the rating gap grows.
-        """
-        diff = self.rating_for(team_a) + a_advantage - self.rating_for(team_b)
-        p_raw = 1.0 / (1.0 + 10 ** (-diff / 400.0))  # a's share ignoring draws
-        draw = self.max_draw * (1.0 - abs(2.0 * p_raw - 1.0))
-        remaining = 1.0 - draw
-        return remaining * p_raw, draw, remaining * (1.0 - p_raw)
+        la, lb = dc.lambdas_from_elo(self.rating_for(team_a), self.rating_for(team_b),
+                                     a_advantage=a_advantage)
+        return dc.score_matrix(la, lb)
+
+    def match_probs(self, team_a: str, team_b: str, a_advantage: float = 0.0) -> tuple[float, float, float]:
+        """(P(team_a win), P(draw), P(team_b win)) from the Dixon-Coles matrix."""
+        from . import dixon_coles as dc
+
+        return dc.outcome_probs(self.score_matrix(team_a, team_b, a_advantage))
 
     def contextual_match_probs(self, team_a: str, team_b: str, ctx):
         """match_probs with altitude/host/form adjustments; returns (probs, why)."""

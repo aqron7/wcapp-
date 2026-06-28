@@ -26,9 +26,12 @@ def test_totals_predictions_use_strike():
 
 
 def test_totals_edge_when_market_underprices_over():
-    # Model P(over 2.5) ~ 0.52 at lambda 2.75; market sells YES well below fair.
-    quotes = [_total_quote(2.5, "3", 0.36, 0.38)]
-    preds = predictions_for_sport("soccer", quotes)
-    ideas = find_value_edges(quotes, preds, Config())
+    # MLB totals use flat Poisson (soccer totals now go through Dixon-Coles).
+    # Model P(over 8.5) ~ 0.54 at lambda 8.6; market sells YES well below fair.
+    q = MarketQuote("kalshi", "KXMLBTOTAL-E-9", "Total Runs?", 0.36, 0.38,
+                    sport="mlb", event_key="KXMLBTOTAL-E", outcome="9",
+                    outcome_label="Over 8.5", market_type="total", strike=8.5)
+    preds = predictions_for_sport("mlb", [q])
+    ideas = find_value_edges([q], preds, Config())
     assert ideas and ideas[0].side is Side.YES
-    assert "KXWCTOTAL-E-3" == ideas[0].market_id
+    assert ideas[0].market_id == "KXMLBTOTAL-E-9"

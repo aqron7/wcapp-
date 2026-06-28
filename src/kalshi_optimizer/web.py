@@ -28,16 +28,43 @@ _INDEX = Path(__file__).with_name("static") / "index.html"
 LIVE = realtime.LiveBook()
 
 
+def _market_type(market_id: str) -> str:
+    from .data.kalshi import SERIES_TYPE
+    return SERIES_TYPE.get(market_id.split("-", 1)[0], "winner")
+
+
+def _game_key(market_id: str) -> str:
+    ev = market_id.rsplit("-", 1)[0]
+    return ev.split("-", 1)[1] if "-" in ev else ev
+
+
 def _edge_dict(idea, sport: str) -> dict:
     side_fair = idea.fair_prob if idea.side.value == "yes" else 1 - idea.fair_prob
     return {
         "sport": sport, "title": idea.title, "market_id": idea.market_id,
         "event_ticker": idea.market_id.rsplit("-", 1)[0],
         "outcome": idea.market_id.rsplit("-", 1)[-1],
+        "market_type": _market_type(idea.market_id),
+        "game_key": _game_key(idea.market_id),
         "side": idea.side.value, "price": round(idea.price, 2),
         "fair": round(idea.fair_prob, 2), "fair_side": round(side_fair, 2),
         "edge": round(idea.edge, 4), "stake": idea.stake, "why": idea.rationale,
     }
+
+
+def _all_edges(config) -> list[dict]:
+    if LIVE.connected and LIVE.markets:
+        return [_edge_dict(i, _sport_of(i.market_id)) for i in LIVE.edges(config)]
+    kalshi = KalshiClient(config.secrets)
+    edges: list[dict] = []
+    for sport in ("soccer", "mlb"):
+        try:
+            quotes = kalshi.get_sports_markets(sport)
+            edges += [_edge_dict(i, sport)
+                      for i in find_value_edges(quotes, predictions_with_context(sport, quotes), config)]
+        except Exception:  # noqa: BLE001
+            pass
+    return edges
 
 
 @app.on_event("startup")
@@ -118,6 +145,28 @@ def api_account() -> dict:
         return {"ok": True, "balance": dollars}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)}
+
+
+@app.get("/api/games")
+def api_games(min_edge: float = 0.03) -> dict:
+    """Group edges by game and list the recommended picks per market for each."""
+    config = _config(min_edge, 0.25, 1000.0)
+    games: dict[str, dict] = {}
+    for e in _all_edges(config):
+        g = games.setdefault(e["game_key"], {
+            "game_key": e["game_key"], "sport": e["sport"],
+            "label": None, "picks": [], "best": 0.0})
+        g["picks"].append(e)
+        g["best"] = max(g["best"], e["edge"])
+        if e["market_type"] == "winner" and not g["label"]:
+            g["label"] = e["title"].split(" Winner")[0].split(" [")[0]
+    out = list(games.values())
+    for g in out:
+        if not g["label"]:
+            g["label"] = g["picks"][0]["title"]
+        g["picks"].sort(key=lambda p: p["edge"], reverse=True)
+    out.sort(key=lambda g: g["best"], reverse=True)
+    return {"games": out}
 
 
 @app.get("/api/live/status")

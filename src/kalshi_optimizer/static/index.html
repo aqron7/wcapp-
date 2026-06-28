@@ -115,6 +115,23 @@
   .foot b{color:var(--text);font-weight:500}
   button.mini{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:3px;
     font-size:10px;padding:3px 8px;cursor:pointer;letter-spacing:.06em}
+  .ctabs{display:flex;border-bottom:1px solid var(--border);flex:none}
+  .ctab{background:transparent;border:0;color:var(--dim);padding:11px 18px;cursor:pointer;font-size:12px;
+    font-weight:600;letter-spacing:.04em;border-bottom:2px solid transparent}
+  .ctab.on{color:var(--bright);border-bottom-color:var(--accent)}
+  #chartview{flex:1;min-height:0;display:flex;flex-direction:column}
+  #gamesview{flex:1;min-height:0;padding:12px 14px}
+  .gcard{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:10px}
+  .gcard h4{margin:0 0 2px;font-size:15px}
+  .gcard .gmeta{font-size:10px;color:var(--dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em}
+  .gpick{display:grid;grid-template-columns:58px 1fr auto auto;gap:10px;align-items:center;
+    padding:7px 0;border-top:1px solid var(--border);cursor:pointer}
+  .gpick:hover{background:var(--panel2)}
+  .mtype{font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);
+    border:1px solid var(--border);border-radius:3px;padding:2px 0;text-align:center}
+  .gpick .gp{font-size:12px} .gpick .gp b{font-weight:600}
+  .gpick .gpx{font-family:"Roboto Mono";font-size:12px;text-align:right;color:var(--dim)}
+  .gpick .gpe{font-family:"Roboto Mono";font-size:12px;font-weight:700;text-align:right}
   .empty{padding:20px 14px;color:var(--dim);font-family:"Roboto Mono";font-size:11px;text-align:center;line-height:1.7}
   @media (max-width:1100px){.wrap{grid-template-columns:1fr}.col.left,.col.right{display:none}}
 </style>
@@ -145,14 +162,21 @@
     <div class="scroll" id="watchlist"><div class="empty">Loading…</div></div>
   </div>
 
-  <!-- chart -->
+  <!-- chart / games -->
   <div class="col">
-    <div class="symhead" id="symhead"><h2 class="dim">Select a market</h2></div>
-    <div class="chartbox">
-      <svg id="chart" preserveAspectRatio="none"></svg>
-      <div class="chart-empty" id="chartEmpty">No market selected.</div>
+    <div class="ctabs">
+      <button class="ctab on" data-v="chart">Chart</button>
+      <button class="ctab" data-v="games">Games &amp; picks</button>
     </div>
-    <div class="readout" id="readout"></div>
+    <div id="chartview">
+      <div class="symhead" id="symhead"><h2 class="dim">Select a market</h2></div>
+      <div class="chartbox">
+        <svg id="chart" preserveAspectRatio="none"></svg>
+        <div class="chart-empty" id="chartEmpty">No market selected.</div>
+      </div>
+      <div class="readout" id="readout"></div>
+    </div>
+    <div id="gamesview" class="scroll" style="display:none"></div>
   </div>
 
   <!-- ticket + positions -->
@@ -358,6 +382,38 @@ function connectWS(){
     else{ p.className="pill"; p.innerHTML='<span class="dot"></span>offline · REST'; } };
   ws.onclose=()=>{ $("#pill").className="pill"; $("#pill").innerHTML='<span class="dot"></span>offline · REST'; setTimeout(connectWS,4000); };
   ws.onerror=()=>{try{ws.close();}catch(e){}};
+}
+
+const MONTHS={JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
+function gameDate(gk){
+  const m=gk.match(/^(\d{2})([A-Z]{3})(\d{2})/);
+  if(!m) return "";
+  const dt=new Date(2000+ +m[1], MONTHS[m[2]]??0, +m[3]);
+  return dt.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+function switchView(v){
+  document.querySelectorAll(".ctab").forEach(t=>t.classList.toggle("on",t.dataset.v===v));
+  $("#chartview").style.display=v==="chart"?"flex":"none";
+  $("#gamesview").style.display=v==="games"?"block":"none";
+  if(v==="games") loadGames();
+}
+document.querySelectorAll(".ctab").forEach(t=>t.onclick=()=>switchView(t.dataset.v));
+
+async function loadGames(){
+  const el=$("#gamesview");
+  const d=await (await fetch("/api/games?min_edge="+S.minEdge)).json();
+  const games=(d.games||[]).filter(g=>S.sports.includes(g.sport));
+  if(!games.length){ el.innerHTML=`<div class="empty">No games with edges above ${pct(S.minEdge)}% right now.</div>`; return; }
+  el.innerHTML=games.map(g=>`<div class="gcard">
+    <h4>${g.label}</h4>
+    <div class="gmeta">${g.sport} · ${gameDate(g.game_key)} · best <b style="color:var(--up)">+${(g.best*100).toFixed(1)}%</b></div>
+    ${g.picks.map(p=>`<div class="gpick" data-id="${p.market_id}">
+      <span class="mtype">${p.market_type}</span>
+      <span class="gp"><b class="${p.side=='yes'?'up':'down'}">${p.side.toUpperCase()}</b> ${pick(p.title)}</span>
+      <span class="gpx">${p.price.toFixed(2)}</span>
+      <span class="gpe up">+${(p.edge*100).toFixed(1)}%</span></div>`).join("")}
+  </div>`).join("");
+  el.querySelectorAll(".gpick").forEach(r=>r.onclick=()=>{ switchView("chart"); select(r.dataset.id); });
 }
 
 $("#autopar").onclick=async()=>{

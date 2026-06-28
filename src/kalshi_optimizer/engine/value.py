@@ -57,12 +57,48 @@ def predictions_for_sport(sport: str, quotes: list[MarketQuote],
                 home_pitcher_adj=_form_delta(form, home),
                 away_pitcher_adj=_form_delta(form, away),
             )
+        preds += totals_predictions(quotes, "mlb")  # flat Poisson on runs
     elif sport == "soccer":
-        preds += soccer_predictions(quotes, SoccerModel(), form, venues)
+        model = SoccerModel()
+        preds += soccer_predictions(quotes, model, form, venues)
+        preds += soccer_totals_predictions(quotes, model)  # Dixon-Coles scoreline
     else:
         return []
+    return preds
 
-    preds += totals_predictions(quotes, sport)  # over/under markets (Poisson)
+
+def _game_key(event_ticker: str) -> str:
+    """Date+teams part shared across a game's market series (KXWCGAME / KXWCTOTAL)."""
+    return event_ticker.split("-", 1)[1] if "-" in event_ticker else event_ticker
+
+
+def soccer_totals_predictions(quotes: list[MarketQuote], model: SoccerModel) -> list[Prediction]:
+    """Over/under predictions from the Dixon-Coles scoreline matrix per game.
+
+    Totals markets don't name teams, so the two teams are taken from the same
+    game's winner markets (matched on the shared date+teams key).
+    """
+    from ..models import dixon_coles as dc
+
+    game_teams: dict[str, dict[str, str]] = {}
+    for q in quotes:
+        if (q.sport == "soccer" and q.market_type == "winner" and q.event_key
+                and q.outcome and q.outcome != "TIE"):
+            game_teams.setdefault(_game_key(q.event_key), {})[q.outcome] = _clean_label(q.outcome_label)
+
+    matrices: dict[str, list] = {}
+    preds: list[Prediction] = []
+    for q in quotes:
+        if q.market_type != "total" or q.sport != "soccer" or q.strike is None or not q.outcome:
+            continue
+        gk = _game_key(q.event_key)
+        teams = list(game_teams.get(gk, {}).values())
+        if len(teams) != 2:
+            continue
+        if gk not in matrices:
+            matrices[gk] = model.score_matrix(teams[0], teams[1])
+        preds.append(Prediction(q.event_key, q.outcome,
+                                dc.prob_over(matrices[gk], q.strike), "soccer", "dc_total_v1"))
     return preds
 
 
