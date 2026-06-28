@@ -259,6 +259,16 @@ def cmd_fit(config: Config, sport: str) -> None:
     console.print(f"Fitted {len(games)} games -> {ratings_path(sport)}")
     console.print("Top: " + ", ".join(f"{k} {v:.0f}" for k, v in top))
 
+    if sport == "mlb":
+        from .models.mlb_totals import DIST_PATH, fit_distribution, save_distribution
+        settled = list(kalshi.iter_raw_markets("mlb", status="settled", series_list=["KXMLBTOTAL"]))
+        dist = fit_distribution(settled)
+        if dist:
+            save_distribution(dist)
+            console.print(f"Fitted run-total distribution ({len(dist)} lines) -> {DIST_PATH}")
+        else:
+            console.print("[yellow]Not enough settled totals to fit a distribution yet.[/yellow]")
+
 
 def cmd_calibrate(config: Config, sport: str) -> None:
     """Walk-forward calibration of the winner model from settled games."""

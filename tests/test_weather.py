@@ -1,6 +1,6 @@
 """Tests for weather totals adjustment and recent-form blending."""
 
-from kalshi_optimizer.engine.value import mlb_weather_totals
+from kalshi_optimizer.engine.value import mlb_totals_predictions
 from kalshi_optimizer.models.props import _blend_recent
 from kalshi_optimizer.types import MarketQuote
 from kalshi_optimizer.weather import PARK_COORDS, totals_multiplier
@@ -34,6 +34,6 @@ def test_weather_totals_override_scales_with_multiplier():
                         outcome="9", outcome_label="Over 8.5", market_type="total", strike=8.5)
     quotes = [w("MIA"), w("STL"), total]
 
-    hot = {p.outcome: p.fair_prob for p in mlb_weather_totals(quotes, lambda c, d, h: 1.08)}
-    cold = {p.outcome: p.fair_prob for p in mlb_weather_totals(quotes, lambda c, d, h: 0.92)}
+    hot = {p.outcome: p.fair_prob for p in mlb_totals_predictions(quotes, lambda c, d, h: 1.08)}
+    cold = {p.outcome: p.fair_prob for p in mlb_totals_predictions(quotes, lambda c, d, h: 0.92)}
     assert hot["9"] > cold["9"]   # warmer -> higher P(over)

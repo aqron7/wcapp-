@@ -34,8 +34,8 @@ def predictions_with_context(sport: str, quotes: list[MarketQuote]) -> list[Pred
         preds += prop_predictions_live(quotes)  # K / HR / hits via MLB StatsAPI
         try:
             from ..weather import WeatherProvider
-            # Appended last -> overrides the flat totals for the same markets.
-            preds += mlb_weather_totals(quotes, WeatherProvider().multiplier)
+            # Appended last -> overrides the no-weather totals for the same markets.
+            preds += mlb_totals_predictions(quotes, WeatherProvider().multiplier)
         except Exception:  # noqa: BLE001
             pass
     return preds
@@ -55,8 +55,6 @@ def predictions_for_sport(sport: str, quotes: list[MarketQuote],
     ``form`` maps team code -> recent win rate; ``venues`` maps event_ticker ->
     venue city (for soccer altitude/host). Both optional.
     """
-    from ..models.poisson import totals_predictions
-
     preds: list[Prediction] = []
     if sport == "mlb":
         from ..models.baseball import BaseballModel
@@ -69,7 +67,7 @@ def predictions_for_sport(sport: str, quotes: list[MarketQuote],
                 home_pitcher_adj=_form_delta(form, home),
                 away_pitcher_adj=_form_delta(form, away),
             )
-        preds += totals_predictions(quotes, "mlb")  # flat Poisson on runs
+        preds += mlb_totals_predictions(quotes)  # empirical run distribution
     elif sport == "soccer":
         model = SoccerModel()
         preds += soccer_predictions(quotes, model, form, venues)
@@ -157,26 +155,33 @@ def _parse_dt(event_ticker: str):
     return f"20{m.group(1)}-{_MONTHS[m.group(2)]:02d}-{m.group(3)}", int(m.group(4))
 
 
-def mlb_weather_totals(quotes: list[MarketQuote], mult_fn) -> list[Prediction]:
-    """Weather-adjusted MLB run totals; overrides the flat-Poisson totals.
+_MLB_TOTAL_MEAN = 8.6
 
-    ``mult_fn(home_code, date, hour) -> multiplier`` (e.g. WeatherProvider).
+
+def mlb_totals_predictions(quotes: list[MarketQuote], mult_fn=None) -> list[Prediction]:
+    """MLB run totals from the fitted empirical distribution (Poisson fallback).
+
+    Optional ``mult_fn(home_code, date, hour) -> weather multiplier`` shifts the
+    effective line (warmer -> lower line -> more overs).
     """
-    from ..models.poisson import AVG_TOTAL, prob_over
+    from ..models import mlb_totals as mt
 
-    home_by_gk = {_game_key(ek): home for ek, home, _away in matchups_from_quotes(quotes, "mlb")}
-    base = AVG_TOTAL["mlb"]
+    dist = mt.load_distribution()
+    home_by_gk = ({_game_key(ek): h for ek, h, _a in matchups_from_quotes(quotes, "mlb")}
+                  if mult_fn else {})
     preds: list[Prediction] = []
     for q in quotes:
         if q.market_type != "total" or q.sport != "mlb" or q.strike is None or not q.outcome:
             continue
-        home = home_by_gk.get(_game_key(q.event_key))
-        if not home:
-            continue
-        date, hour = _parse_dt(q.event_key)
-        mult = mult_fn(home, date, hour) if (mult_fn and date) else 1.0
-        preds.append(Prediction(q.event_key, q.outcome, prob_over(base * mult, q.strike),
-                                "mlb", "mlb_total_weather_v1"))
+        line = q.strike
+        if mult_fn:
+            home = home_by_gk.get(_game_key(q.event_key))
+            date, hour = _parse_dt(q.event_key)
+            if home and date:
+                mult = mult_fn(home, date, hour)
+                line = q.strike - (mult - 1.0) * _MLB_TOTAL_MEAN  # warm -> easier over
+        preds.append(Prediction(q.event_key, q.outcome, mt.prob_over(line, dist),
+                                "mlb", "mlb_total_fit_v1"))
     return preds
 
 
