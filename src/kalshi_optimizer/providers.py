@@ -40,7 +40,7 @@ def _gemini_one(model: str, prompt: str, system: str | None, key: str) -> str:
            f"{model}:generateContent?key={key}")
     text = f"{system}\n\n{prompt}" if system else prompt
     body = {"contents": [{"parts": [{"text": text}]}],
-            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1200}}
+            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048}}
     r = requests.post(url, json=body, timeout=30)
     r.raise_for_status()
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]

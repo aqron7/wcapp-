@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import re
-import time
 from datetime import datetime, timezone
 
 from .engine.value import predictions_with_context
@@ -94,6 +93,52 @@ def build_batch_prompt(persona_desc: str, packets: list[dict]) -> str:
         '[{"market_id":"<id>","side":"yes","confidence":0.0-1.0,"rationale":"one sentence"}]. '
         "Use market_id values exactly as listed; include only games you have a pick for."
     )
+
+
+def build_all_prompt(personas: dict[str, str], packets: list[dict]) -> str:
+    """One prompt covering every persona AND every game (1 LLM call per run)."""
+    blocks = []
+    for pk in packets:
+        lines = "\n".join(f"  - {m['market_id']} | {m['desc']} | price {m['price']} | model_fair {m['fair']}"
+                          for m in pk["markets"][:8])
+        blocks.append(f"GAME {pk['game_key']}: {pk['label']} ({pk['sport']})\n{lines}")
+    roster = "\n".join(f"- {name}: {desc}" for name, desc in personas.items())
+    return (
+        "You are a panel of distinct sports-betting analysts. Each has a perspective:\n"
+        f"{roster}\n\n"
+        "Today's games and the bets available for each (id | description | price | model_fair):\n\n"
+        + "\n\n".join(blocks) + "\n\n"
+        "For EACH analyst, pick AT MOST ONE bet per game that fits that analyst's "
+        'perspective, or skip the game. "side" is "yes" to back the listed outcome, '
+        '"no" to bet against it.\n'
+        'Reply ONLY with a JSON array, one object per pick: '
+        '[{"analyst":"<exact name>","market_id":"<id>","side":"yes",'
+        '"confidence":0.0-1.0,"rationale":"one sentence"}]. '
+        "Use analyst names and market_id values exactly as listed."
+    )
+
+
+def parse_multi(text: str, valid_ids: set[str], valid_personas: set[str]) -> list[dict]:
+    """Parse the combined panel response into per-analyst picks."""
+    m = re.search(r"\[.*\]", text, re.DOTALL)
+    if not m:
+        return []
+    try:
+        arr = json.loads(m.group(0))
+    except ValueError:
+        return []
+    out = []
+    for d in arr if isinstance(arr, list) else []:
+        if not isinstance(d, dict):
+            continue
+        analyst = str(d.get("analyst", ""))
+        if analyst not in valid_personas:
+            continue
+        one = parse_pick(json.dumps(d), valid_ids)
+        if one:
+            one["analyst"] = analyst
+            out.append(one)
+    return out
 
 
 def parse_batch(text: str, valid_ids: set[str]) -> list[dict]:
@@ -180,25 +225,28 @@ def generate_takes(quotes: list[MarketQuote], sport: str, secrets,
     if not packets:
         return []
     chosen = personas or list(PERSONAS)
-    # market_id -> (packet, yes_mid) so one batched response maps back to games.
+    roster = {name: PERSONAS[name] for name in chosen if name in PERSONAS}
+    # market_id -> (packet, yes_mid) so the batched response maps back to games.
     meta = {m["market_id"]: (pk, m["price"]) for pk in packets for m in pk["markets"]}
     valid = set(meta)
     ts = datetime.now(timezone.utc).isoformat()
     date = ts[:10]
+
+    # One LLM call for the whole panel — cheapest on the free daily quota.
+    try:
+        text = llm_complete(build_all_prompt(roster, packets),
+                            system="You are a panel of sharp sports betting analysts.",
+                            secrets=secrets)
+    except Exception:  # noqa: BLE001
+        return []
+
     out: list[dict] = []
-    for persona in chosen:   # one LLM call per persona (free-tier friendly)
-        try:
-            text = llm_complete(build_batch_prompt(PERSONAS[persona], packets),
-                                system="You are a sharp sports betting analyst.", secrets=secrets)
-        except Exception:  # noqa: BLE001
-            continue
-        for pick in parse_batch(text, valid):
-            pk, yes_mid = meta[pick["market_id"]]
-            entry = yes_mid if pick["side"] == "yes" else round(1 - yes_mid, 2)
-            out.append({"ts": ts, "date": date, "sport": sport, "analyst": persona,
-                        "game_key": pk["game_key"], "game_label": pk["label"],
-                        "market_id": pick["market_id"], "side": pick["side"],
-                        "price": entry, "confidence": pick["confidence"],
-                        "rationale": pick["rationale"]})
-        time.sleep(1.0)   # ~1 call/persona/sec stays under free-tier limits
+    for pick in parse_multi(text, valid, set(roster)):
+        pk, yes_mid = meta[pick["market_id"]]
+        entry = yes_mid if pick["side"] == "yes" else round(1 - yes_mid, 2)
+        out.append({"ts": ts, "date": date, "sport": sport, "analyst": pick["analyst"],
+                    "game_key": pk["game_key"], "game_label": pk["label"],
+                    "market_id": pick["market_id"], "side": pick["side"],
+                    "price": entry, "confidence": pick["confidence"],
+                    "rationale": pick["rationale"]})
     return out

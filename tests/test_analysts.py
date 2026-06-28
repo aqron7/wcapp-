@@ -26,6 +26,18 @@ def test_parse_batch_array():
     assert analysts.parse_batch("no json", valid) == []
 
 
+def test_parse_multi_filters_analyst_and_id():
+    valid = {"E-A", "E-B"}
+    personas = {"Quant", "Contrarian"}
+    text = ('[{"analyst":"Quant","market_id":"E-A","side":"yes","confidence":0.6,"rationale":"r"},'
+            '{"analyst":"Ghost","market_id":"E-B","side":"yes"},'        # unknown analyst -> dropped
+            '{"analyst":"Contrarian","market_id":"E-Z","side":"no"},'    # bad id -> dropped
+            '{"analyst":"Contrarian","market_id":"E-B","side":"no","confidence":0.8,"rationale":"r2"}]')
+    picks = analysts.parse_multi(text, valid, personas)
+    assert [(p["analyst"], p["market_id"]) for p in picks] == [("Quant", "E-A"), ("Contrarian", "E-B")]
+    assert analysts.parse_multi("no json", valid, personas) == []
+
+
 def test_build_packets_groups_and_filters():
     quotes = [
         MarketQuote("kalshi", "KXWCGAME-G-ESP", "Spain vs Austria Winner?", 0.5, 0.52,
