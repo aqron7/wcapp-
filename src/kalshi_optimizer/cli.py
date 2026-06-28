@@ -260,6 +260,36 @@ def cmd_fit(config: Config, sport: str) -> None:
     console.print("Top: " + ", ".join(f"{k} {v:.0f}" for k, v in top))
 
 
+def cmd_calibrate(config: Config, sport: str) -> None:
+    """Walk-forward calibration of the winner model from settled games."""
+    from .backtest.model_backtest import report
+    from .data.kalshi import KalshiClient
+    from .models.baseball import DEFAULT_MLB_RATINGS
+    from .models.fit import FIT_K, games_from_settled
+    from .models.soccer import DEFAULT_RATINGS
+
+    winner_series = {"soccer": "KXWCGAME", "mlb": "KXMLBGAME"}.get(sport)
+    if not winner_series:
+        console.print(f"[yellow]no winner series for {sport}[/yellow]")
+        return
+    kalshi = KalshiClient(config.secrets)
+    raw = list(kalshi.iter_raw_markets(sport, status="settled", series_list=[winner_series]))
+    games = games_from_settled(raw, sport)
+    init = ({k.lower(): v for k, v in DEFAULT_RATINGS.items()} if sport == "soccer"
+            else dict(DEFAULT_MLB_RATINGS))
+    r = report(games, init, k=FIT_K.get(sport, 20.0))
+    if not r.get("n"):
+        console.print(f"[yellow]No settled {sport} games to calibrate from.[/yellow]")
+        return
+    verdict = "beats coin flip" if r["brier"] < r["baseline_brier"] else "[red]no better than coin flip[/red]"
+    console.print(f"{sport}: {r['n']} games  Brier {r['brier']} vs baseline "
+                  f"{r['baseline_brier']} ({verdict}); log-loss {r['log_loss']}")
+    console.print("Reliability (pred -> actual):")
+    for bk in r["reliability"]:
+        console.print(f"  {bk['lo']:.1f}-{bk['hi']:.1f}: pred {bk['pred']:.2f} "
+                      f"actual {bk['actual']:.2f}  (n={bk['n']})")
+
+
 def cmd_auth_check(config: Config) -> None:
     """Verify RSA signing against an authenticated Kalshi endpoint."""
     kalshi = KalshiClient(config.secrets)
@@ -331,6 +361,8 @@ def main() -> None:
     sub.add_parser("demo-edges", help="run value engine on bundled fixtures (no network)")
     p_fit = sub.add_parser("fit", help="fit Elo ratings from settled games")
     p_fit.add_argument("sport", help="sport key, e.g. mlb or soccer")
+    p_cal = sub.add_parser("calibrate", help="walk-forward model calibration from settled games")
+    p_cal.add_argument("sport", help="sport key, e.g. mlb or soccer")
     sub.add_parser("auth-check", help="verify Kalshi API auth on a private endpoint")
     sub.add_parser("dashboard", help="launch the web dashboard (phase 5)")
     sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
@@ -357,6 +389,9 @@ def main() -> None:
         return
     if args.command == "fit":
         cmd_fit(config, args.sport)
+        return
+    if args.command == "calibrate":
+        cmd_calibrate(config, args.sport)
         return
 
     {

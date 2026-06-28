@@ -74,6 +74,54 @@ def settle_pending(conn) -> int:
     return settled
 
 
+def live_positions(conn, price_map: dict[str, float]) -> list[dict]:
+    """Pending bets marked to market. ``price_map`` is market_id -> live YES mid."""
+    out = []
+    for b in storage.list_bets(conn):
+        if b["status"] != "pending":
+            continue
+        legs = json.loads(b["legs_json"])
+        cost, ok, cur_legs = 1.0, True, []
+        for leg in legs:
+            mid = price_map.get(leg["market_id"])
+            cur = None if mid is None else (mid if leg["side"] == "yes" else 1.0 - mid)
+            if cur is None:
+                ok = False
+            else:
+                cost *= cur
+            cur_legs.append({"label": leg.get("label"), "side": leg["side"],
+                             "entry": leg.get("price"),
+                             "current": None if cur is None else round(cur, 2)})
+        current = round(cost, 4) if ok else None
+        entry = b["entry_price"]
+        unreal = round(b["stake"] * (current / entry - 1), 2) if (ok and entry) else None
+        out.append({"id": b["id"], "description": b["description"], "kind": b["kind"],
+                    "stake": b["stake"], "entry": entry, "current": current,
+                    "unrealized": unreal, "legs": cur_legs})
+    return out
+
+
+def calendar(conn) -> list[dict]:
+    """Bets grouped by placed date: count, staked, settled P&L, pending count."""
+    days: dict[str, dict] = {}
+    for b in storage.list_bets(conn):
+        date = (b["placed_ts"] or "")[:10]
+        if not date:
+            continue
+        d = days.setdefault(date, {"date": date, "count": 0, "staked": 0.0,
+                                   "pnl": 0.0, "pending": 0})
+        d["count"] += 1
+        d["staked"] += b["stake"]
+        if b["status"] == "pending":
+            d["pending"] += 1
+        else:
+            d["pnl"] += b["pnl"] or 0
+    for d in days.values():
+        d["staked"] = round(d["staked"], 2)
+        d["pnl"] = round(d["pnl"], 2)
+    return sorted(days.values(), key=lambda x: x["date"])
+
+
 def summary(conn) -> dict:
     """Aggregate ledger stats + a cumulative P&L curve."""
     bets = storage.list_bets(conn)

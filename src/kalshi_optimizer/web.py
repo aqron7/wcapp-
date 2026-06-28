@@ -169,6 +169,42 @@ def api_games(min_edge: float = 0.03) -> dict:
     return {"games": out}
 
 
+@app.get("/api/positions/live")
+def api_positions_live() -> dict:
+    """Pending bets marked to market against live WS prices."""
+    price_map = {mid: q.yes_mid for mid, q in LIVE.markets.items() if q.yes_mid}
+    conn = storage.connect()
+    return {"live": bool(LIVE.connected and price_map),
+            "positions": ledger.live_positions(conn, price_map)}
+
+
+@app.get("/api/calendar")
+def api_calendar() -> dict:
+    return {"days": ledger.calendar(storage.connect())}
+
+
+@app.get("/api/calibration")
+def api_calibration(sport: str = "mlb") -> dict:
+    """Walk-forward calibration of the winner model from settled games."""
+    from .backtest.model_backtest import report
+    from .models.baseball import DEFAULT_MLB_RATINGS
+    from .models.fit import FIT_K, games_from_settled
+    from .models.soccer import DEFAULT_RATINGS
+
+    winner_series = {"soccer": "KXWCGAME", "mlb": "KXMLBGAME"}.get(sport)
+    if not winner_series:
+        return {"n": 0}
+    try:
+        kalshi = KalshiClient(Config.load().secrets)
+        raw = list(kalshi.iter_raw_markets(sport, status="settled", series_list=[winner_series]))
+        games = games_from_settled(raw, sport)
+        init = ({k.lower(): v for k, v in DEFAULT_RATINGS.items()} if sport == "soccer"
+                else dict(DEFAULT_MLB_RATINGS))
+        return report(games, init, k=FIT_K.get(sport, 20.0))
+    except Exception as exc:  # noqa: BLE001
+        return {"n": 0, "error": str(exc)}
+
+
 @app.get("/api/live/status")
 def api_live_status() -> dict:
     return {"connected": LIVE.connected, "markets": len(LIVE.markets),

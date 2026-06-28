@@ -120,7 +120,17 @@
     font-weight:600;letter-spacing:.04em;border-bottom:2px solid transparent}
   .ctab.on{color:var(--bright);border-bottom-color:var(--accent)}
   #chartview{flex:1;min-height:0;display:flex;flex-direction:column}
-  #gamesview{flex:1;min-height:0;padding:12px 14px}
+  #gamesview,#posview,#calview{flex:1;min-height:0;padding:12px 14px}
+  .unreal{font-family:"Roboto Mono";font-size:20px;font-weight:700}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .cal-h{font-size:10px;color:var(--dim);text-transform:uppercase;text-align:center;padding:3px}
+  .cal-cell{min-height:62px;border:1px solid var(--border);border-radius:5px;padding:5px;background:var(--panel)}
+  .cal-cell.empty{background:transparent;border:0}
+  .cal-cell.has{background:var(--panel2)}
+  .cal-cell.today{box-shadow:inset 0 0 0 1px var(--accent)}
+  .cal-d{font-size:11px;color:var(--dim)}
+  .cal-n{font-size:11px;margin-top:3px}
+  .cal-p{font-family:"Roboto Mono";font-size:13px;font-weight:700;margin-top:1px}
   .gcard{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:10px}
   .gcard h4{margin:0 0 2px;font-size:15px}
   .gcard .gmeta{font-size:10px;color:var(--dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em}
@@ -167,6 +177,8 @@
     <div class="ctabs">
       <button class="ctab on" data-v="chart">Chart</button>
       <button class="ctab" data-v="games">Games &amp; picks</button>
+      <button class="ctab" data-v="positions">Live bets</button>
+      <button class="ctab" data-v="calendar">Calendar</button>
     </div>
     <div id="chartview">
       <div class="symhead" id="symhead"><h2 class="dim">Select a market</h2></div>
@@ -177,6 +189,8 @@
       <div class="readout" id="readout"></div>
     </div>
     <div id="gamesview" class="scroll" style="display:none"></div>
+    <div id="posview" class="scroll" style="display:none"></div>
+    <div id="calview" class="scroll" style="display:none"></div>
   </div>
 
   <!-- ticket + positions -->
@@ -378,7 +392,8 @@ function connectWS(){
   let ws; try{ ws=new WebSocket((location.protocol=="https:"?"wss":"ws")+"://"+location.host+"/ws"); }catch(e){return;}
   ws.onmessage=ev=>{ const d=JSON.parse(ev.data); const p=$("#pill");
     if(d.live){ p.className="pill live"; p.innerHTML='<span class="dot"></span>live · ws';
-      setEdges((d.edges||[]).filter(e=>e.edge>=S.minEdge)); }
+      setEdges((d.edges||[]).filter(e=>e.edge>=S.minEdge));
+      if($("#posview").style.display!=="none") loadPositions(); }
     else{ p.className="pill"; p.innerHTML='<span class="dot"></span>offline · REST'; } };
   ws.onclose=()=>{ $("#pill").className="pill"; $("#pill").innerHTML='<span class="dot"></span>offline · REST'; setTimeout(connectWS,4000); };
   ws.onerror=()=>{try{ws.close();}catch(e){}};
@@ -391,13 +406,50 @@ function gameDate(gk){
   const dt=new Date(2000+ +m[1], MONTHS[m[2]]??0, +m[3]);
   return dt.toLocaleDateString(undefined,{month:"short",day:"numeric"});
 }
+const VIEWS={chart:"chartview",games:"gamesview",positions:"posview",calendar:"calview"};
 function switchView(v){
   document.querySelectorAll(".ctab").forEach(t=>t.classList.toggle("on",t.dataset.v===v));
-  $("#chartview").style.display=v==="chart"?"flex":"none";
-  $("#gamesview").style.display=v==="games"?"block":"none";
+  for(const k in VIEWS) $("#"+VIEWS[k]).style.display = (v===k)?(k==="chart"?"flex":"block"):"none";
   if(v==="games") loadGames();
+  if(v==="positions") loadPositions();
+  if(v==="calendar") loadCalendar();
 }
 document.querySelectorAll(".ctab").forEach(t=>t.onclick=()=>switchView(t.dataset.v));
+
+async function loadPositions(){
+  const el=$("#posview");
+  const d=await (await fetch("/api/positions/live")).json();
+  if(!d.positions.length){ el.innerHTML=`<div class="empty">No pending bets. Log some from the watchlist or Games tab,<br>then watch them move here in real time.</div>`; return; }
+  el.innerHTML=d.positions.map(p=>{
+    const u=p.unrealized, col=(u||0)>=0?'var(--up)':'var(--down)';
+    return `<div class="gcard"><h4>${p.description}</h4>
+      <div class="gmeta">${p.kind} · stake $${p.stake.toFixed(0)} · entry .${(p.entry||0).toFixed(2).slice(2)} · now ${p.current==null?'—':'.'+p.current.toFixed(2).slice(2)}</div>
+      <div class="unreal" style="color:${col}">${u==null?'—':(u>=0?'+$':'-$')+Math.abs(u).toFixed(2)}<span class="dim" style="font-size:11px;font-weight:400"> unrealized</span></div>
+      ${p.legs.map(l=>`<div class="gpick"><span class="mtype">${l.side}</span><span class="gp">${l.label||''}</span>
+        <span class="gpx">entry ${(l.entry||0).toFixed(2)}</span><span class="gpe">${l.current==null?'—':l.current.toFixed(2)}</span></div>`).join("")}
+    </div>`;}).join("");
+}
+
+async function loadCalendar(){
+  const el=$("#calview");
+  const d=await (await fetch("/api/calendar")).json();
+  const by={}; (d.days||[]).forEach(x=>by[x.date]=x);
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  const start=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate(), todayD=now.getDate();
+  let cells="";
+  for(let i=0;i<start;i++) cells+=`<div class="cal-cell empty"></div>`;
+  for(let day=1;day<=dim;day++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`, x=by[ds];
+    const isToday=day===todayD?' today':'';
+    let body="";
+    if(x){ const pnl=x.pnl;
+      body=`<div class="cal-n">${x.count} bet${x.count>1?'s':''}</div>`+
+        (x.pending?`<div class="cal-p dim">${x.pending} pending</div>`:`<div class="cal-p ${pnl>=0?'up':'down'}">${(pnl>=0?'+$':'-$')+Math.abs(pnl).toFixed(0)}</div>`); }
+    cells+=`<div class="cal-cell ${x?'has':''}${isToday}"><div class="cal-d">${day}</div>${body}</div>`;
+  }
+  el.innerHTML=`<h3 style="margin:0 0 10px">${now.toLocaleString(undefined,{month:'long',year:'numeric'})}</h3>
+    <div class="cal-grid">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(h=>`<div class="cal-h">${h}</div>`).join("")}${cells}</div>`;
+}
 
 async function loadGames(){
   const el=$("#gamesview");
