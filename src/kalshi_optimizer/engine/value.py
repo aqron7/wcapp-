@@ -32,6 +32,12 @@ def predictions_with_context(sport: str, quotes: list[MarketQuote]) -> list[Pred
     if sport == "mlb":
         from ..models.props import prop_predictions_live
         preds += prop_predictions_live(quotes)  # K / HR / hits via MLB StatsAPI
+        try:
+            from ..weather import WeatherProvider
+            # Appended last -> overrides the flat totals for the same markets.
+            preds += mlb_weather_totals(quotes, WeatherProvider().multiplier)
+        except Exception:  # noqa: BLE001
+            pass
     return preds
 
 
@@ -135,6 +141,42 @@ def spread_predictions(quotes: list[MarketQuote], sport: str) -> list[Prediction
         else:
             continue
         preds.append(Prediction(q.event_key, q.outcome, p, sport, "spread_v1"))
+    return preds
+
+
+_DT_RE = re.compile(r"(\d{2})([A-Z]{3})(\d{2})(\d{2})(\d{2})")
+_MONTHS = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+          "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
+
+
+def _parse_dt(event_ticker: str):
+    """(date 'YYYY-MM-DD', hour) from an event ticker like ...26JUN281415MIASTL."""
+    m = _DT_RE.search(event_ticker)
+    if not m or m.group(2) not in _MONTHS:
+        return None, None
+    return f"20{m.group(1)}-{_MONTHS[m.group(2)]:02d}-{m.group(3)}", int(m.group(4))
+
+
+def mlb_weather_totals(quotes: list[MarketQuote], mult_fn) -> list[Prediction]:
+    """Weather-adjusted MLB run totals; overrides the flat-Poisson totals.
+
+    ``mult_fn(home_code, date, hour) -> multiplier`` (e.g. WeatherProvider).
+    """
+    from ..models.poisson import AVG_TOTAL, prob_over
+
+    home_by_gk = {_game_key(ek): home for ek, home, _away in matchups_from_quotes(quotes, "mlb")}
+    base = AVG_TOTAL["mlb"]
+    preds: list[Prediction] = []
+    for q in quotes:
+        if q.market_type != "total" or q.sport != "mlb" or q.strike is None or not q.outcome:
+            continue
+        home = home_by_gk.get(_game_key(q.event_key))
+        if not home:
+            continue
+        date, hour = _parse_dt(q.event_key)
+        mult = mult_fn(home, date, hour) if (mult_fn and date) else 1.0
+        preds.append(Prediction(q.event_key, q.outcome, prob_over(base * mult, q.strike),
+                                "mlb", "mlb_total_weather_v1"))
     return preds
 
 

@@ -68,8 +68,15 @@ def _dates_in_quotes(quotes) -> set[str]:
     return dates
 
 
+def _blend_recent(season_val: float, recent_val: float | None, w: float = 0.5) -> float:
+    """Weight recent form against season (recent ignored if missing/zero)."""
+    if recent_val and recent_val > 0:
+        return w * recent_val + (1 - w) * season_val
+    return season_val
+
+
 def build_pitcher_lambdas(client, dates) -> dict[str, float]:
-    """Fetch probable pitchers + season K rates -> {name_lower: K lambda}."""
+    """Fetch probable pitchers + K rates (recent blended with season)."""
     out: dict[str, float] = {}
     seen: dict[int, float] = {}
     for date in dates:
@@ -79,8 +86,16 @@ def build_pitcher_lambdas(client, dates) -> dict[str, float]:
                 continue
             if pid not in seen:
                 season = client.pitcher_season(pid)
-                seen[pid] = strikeout_lambda(season["k9"], expected_innings(season)) \
-                    if season and season["k9"] > 0 else 0.0
+                if season and season["k9"] > 0:
+                    recent = None
+                    try:
+                        recent = client.pitcher_recent(pid)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    k9 = _blend_recent(season["k9"], recent["k9"] if recent else None)
+                    seen[pid] = strikeout_lambda(k9, expected_innings(season))
+                else:
+                    seen[pid] = 0.0
             if seen[pid] > 0 and p.get("pitcher"):
                 out[p["pitcher"].lower()] = seen[pid]
     return out
@@ -97,8 +112,17 @@ def build_batter_lambdas(client, names: set[str], stat: str, season: int = 2026)
         if not pid:
             continue
         s = client.batter_season(pid)
-        if s and s.get("games", 0) > 0 and s.get(stat, 0) > 0:
-            out[name] = max(0.01, s[stat] / s["games"])
+        if not (s and s.get("games", 0) > 0 and s.get(stat, 0) > 0):
+            continue
+        season_rate = s[stat] / s["games"]
+        recent_rate = None
+        try:
+            r = client.batter_recent(pid)
+            if r and r.get("games", 0) > 0:
+                recent_rate = r[stat] / r["games"]
+        except Exception:  # noqa: BLE001
+            pass
+        out[name] = max(0.01, _blend_recent(season_rate, recent_rate))
     return out
 
 

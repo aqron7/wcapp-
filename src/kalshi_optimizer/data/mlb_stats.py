@@ -92,6 +92,18 @@ class MlbStatsClient:
         r.raise_for_status()
         return parse_pitcher_season(r.json())
 
+    def pitcher_recent(self, pitcher_id: int, n: int = 5) -> dict | None:
+        r = self._session.get(f"{BASE}/people/{pitcher_id}/stats",
+                              params={"stats": "lastXGames", "group": "pitching", "limit": n}, timeout=15)
+        r.raise_for_status()
+        return parse_pitcher_season(r.json())
+
+    def batter_recent(self, player_id: int, n: int = 10) -> dict | None:
+        r = self._session.get(f"{BASE}/people/{player_id}/stats",
+                              params={"stats": "lastXGames", "group": "hitting", "limit": n}, timeout=15)
+        r.raise_for_status()
+        return parse_batter_season(r.json())
+
     def all_players(self, season: int) -> dict[str, int]:
         """name(lower) -> id for all active players in a season (one call)."""
         r = self._session.get(f"{BASE}/sports/1/players", params={"season": season}, timeout=20)
