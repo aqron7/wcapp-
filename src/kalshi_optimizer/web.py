@@ -202,10 +202,11 @@ def api_analysts() -> dict:
             continue
         pid = p["play_id"] or f"legacy-{p['id']}"
         play = plays.setdefault(pid, {
-            "analyst": p["analyst"], "game_key": p["game_key"], "label": p["game_label"],
-            "sport": p["sport"], "play_type": p["play_type"] or "single",
+            "play_id": pid, "analyst": p["analyst"], "game_key": p["game_key"],
+            "label": p["game_label"], "sport": p["sport"],
+            "play_type": p["play_type"] or "single",
             "confidence": p["confidence"], "rationale": p["rationale"], "legs": []})
-        play["legs"].append({"label": p["leg_label"] or p["market_id"],
+        play["legs"].append({"market_id": p["market_id"], "label": p["leg_label"] or p["market_id"],
                              "side": p["side"], "price": p["price"], "stake": p["stake"]})
     games: dict[str, dict] = {}
     for play in plays.values():
@@ -383,6 +384,38 @@ def api_settle() -> dict:
     conn = storage.connect()
     n = ledger.settle_pending(conn)
     return {"settled": n, "summary": ledger.summary(conn)}
+
+
+class PlayToLedgerIn(BaseModel):
+    play_id: str
+    stake: float = 10.0
+    leg_market_id: str = ""   # set to add just one leg as a single bet
+
+
+@app.post("/api/analysts/to_ledger")
+def api_play_to_ledger(req: PlayToLedgerIn) -> dict:
+    """Record an analyst play in the bets ledger — the whole play (single or
+    parlay), or one leg of it as a single when leg_market_id is given."""
+    if req.stake <= 0:
+        return {"ok": False, "error": "stake must be positive"}
+    conn = storage.connect()
+    rows = [p for p in storage.list_analyst_picks(conn) if (p["play_id"] or "") == req.play_id]
+    if req.leg_market_id:
+        rows = [p for p in rows if p["market_id"] == req.leg_market_id]
+    if not rows:
+        return {"ok": False, "error": "play not found"}
+    legs = []
+    for p in rows:
+        price = p["price"] or 0.0
+        legs.append({
+            "market_id": p["market_id"], "side": p["side"], "price": price,
+            "fair_side": price,   # analyst pick, not a model edge -> edge 0
+            "label": p["leg_label"] or p["market_id"],
+            "outcome": p["market_id"].rsplit("-", 1)[-1],
+            "event_ticker": p["market_id"].rsplit("-", 1)[0],
+        })
+    bet_id = ledger.record_bet(conn, legs, req.stake, rows[0]["sport"] or "")
+    return {"ok": True, "id": bet_id, "legs": len(legs)}
 
 
 class OrderIn(BaseModel):

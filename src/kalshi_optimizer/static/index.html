@@ -147,6 +147,9 @@
   .pt-single{background:#1c2230;color:#8a93a6;border:1px solid var(--border)}
   .leg{display:inline-block;font-family:"Roboto Mono";font-size:11px;color:var(--dim);margin-top:3px}
   .leg b{font-weight:700}
+  .addplay,.addleg{font-size:10px;color:var(--accent,#41b8e0);text-decoration:none;margin-left:6px}
+  .addplay:hover,.addleg:hover{text-decoration:underline}
+  .addplay{display:inline-block;margin-top:4px}
   .gpick .gpx{font-family:"Roboto Mono";font-size:12px;text-align:right;color:var(--dim)}
   .gpick .gpe{font-family:"Roboto Mono";font-size:12px;font-weight:700;text-align:right}
   .empty{padding:20px 14px;color:var(--dim);font-family:"Roboto Mono";font-size:11px;text-align:center;line-height:1.7}
@@ -441,11 +444,15 @@ async function loadAnalysts(){
   if(!d.games.length){ html+=`<div class="empty">No analyst takes yet.<br>Tap "Generate today's takes" (needs a free Gemini key).</div>`; }
   else html+=d.games.map(g=>`<div class="gcard"><h4>${g.label}</h4><div class="gmeta">${g.sport}</div>`+
     g.takes.map(t=>{
-      const legs=(t.legs||[]).map(l=>`<span class="leg"><b class="${l.side=='yes'?'up':'down'}">${l.side.toUpperCase()}</b> ${l.label} @ ${Math.round((l.price||0)*100)}¢</span>`).join(' <span class="dim">+</span> ');
+      const multi=(t.legs||[]).length>1;
+      const legs=(t.legs||[]).map(l=>`<span class="leg"><b class="${l.side=='yes'?'up':'down'}">${l.side.toUpperCase()}</b> ${l.label} @ ${Math.round((l.price||0)*100)}¢`+
+        (multi?` <a href="#" class="addleg" data-pid="${t.play_id}" data-mid="${l.market_id||''}">+single</a>`:``)+`</span>`).join(' <span class="dim">+</span> ');
       const pt=(t.play_type||'single').toUpperCase();
       const ptc=pt=='PARLAY'?'pt-parlay':pt=='HEDGE'?'pt-hedge':'pt-single';
+      const addlbl=multi?'+ Add as parlay':'+ Add to ledger';
       return `<div class="gpick"><span class="mtype">${t.analyst}</span>
-      <span class="gp"><span class="ptag ${ptc}">${pt}</span> ${t.rationale}<br>${legs}</span>
+      <span class="gp"><span class="ptag ${ptc}">${pt}</span> ${t.rationale}<br>${legs}
+        <a href="#" class="addplay" data-pid="${t.play_id}">${addlbl}</a></span>
       <span class="gpe up">${(t.confidence*100).toFixed(0)}%</span></div>`;
     }).join("")+`</div>`).join("");
   el.innerHTML=html;
@@ -454,6 +461,16 @@ async function loadAnalysts(){
     const r=await (await fetch("/api/analysts/generate",{method:"POST"})).json();
     gb.textContent=r.ok?`✔ ${r.logged} takes logged`:`⚠ ${r.error||'failed'}`;
     setTimeout(loadAnalysts, 1500); };
+  const addToLedger=async(pid,mid,a)=>{
+    const s=parseFloat(prompt("Stake ($) to add to ledger:","10"));
+    if(!s||s<=0) return;
+    a.textContent="adding…";
+    const r=await (await fetch("/api/analysts/to_ledger",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({play_id:pid,stake:s,leg_market_id:mid||""})})).json();
+    a.textContent=r.ok?`✔ added (${r.legs} leg${r.legs>1?'s':''})`:`⚠ ${r.error||'failed'}`; };
+  el.querySelectorAll(".addplay").forEach(a=>a.onclick=e=>{e.preventDefault();addToLedger(a.dataset.pid,"",a);});
+  el.querySelectorAll(".addleg").forEach(a=>a.onclick=e=>{e.preventDefault();addToLedger(a.dataset.pid,a.dataset.mid,a);});
 }
 document.querySelectorAll(".ctab").forEach(t=>t.onclick=()=>switchView(t.dataset.v));
 
