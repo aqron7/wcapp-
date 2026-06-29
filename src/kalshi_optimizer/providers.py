@@ -53,7 +53,9 @@ def _gemini(prompt: str, system: str | None, key: str) -> str:
             return _gemini_one(model, prompt, system, key)
         except requests.HTTPError as exc:
             code = exc.response.status_code if exc.response is not None else 0
-            if code in (404, 429):   # model gone or its daily bucket is spent — try next
+            # model gone (404), daily bucket spent (429), or transiently overloaded
+            # (500/503) — try the next model rather than giving up.
+            if code in (404, 429, 500, 503):
                 last = exc
                 continue
             raise
