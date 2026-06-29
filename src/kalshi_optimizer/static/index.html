@@ -140,6 +140,13 @@
   .mtype{font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);
     border:1px solid var(--border);border-radius:3px;padding:2px 0;text-align:center}
   .gpick .gp{font-size:12px} .gpick .gp b{font-weight:600}
+  .ptag{display:inline-block;font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    border-radius:3px;padding:1px 5px;margin-right:5px;vertical-align:middle}
+  .pt-parlay{background:#3a2d10;color:#e0b341;border:1px solid #5a4515}
+  .pt-hedge{background:#10303a;color:#41b8e0;border:1px solid #15485a}
+  .pt-single{background:#1c2230;color:#8a93a6;border:1px solid var(--border)}
+  .leg{display:inline-block;font-family:"Roboto Mono";font-size:11px;color:var(--dim);margin-top:3px}
+  .leg b{font-weight:700}
   .gpick .gpx{font-family:"Roboto Mono";font-size:12px;text-align:right;color:var(--dim)}
   .gpick .gpe{font-family:"Roboto Mono";font-size:12px;font-weight:700;text-align:right}
   .empty{padding:20px 14px;color:var(--dim);font-family:"Roboto Mono";font-size:11px;text-align:center;line-height:1.7}
@@ -433,9 +440,14 @@ async function loadAnalysts(){
   }
   if(!d.games.length){ html+=`<div class="empty">No analyst takes yet.<br>Tap "Generate today's takes" (needs a free Gemini key).</div>`; }
   else html+=d.games.map(g=>`<div class="gcard"><h4>${g.label}</h4><div class="gmeta">${g.sport}</div>`+
-    g.takes.map(t=>`<div class="gpick"><span class="mtype">${t.analyst}</span>
-      <span class="gp"><b class="${t.side=='yes'?'up':'down'}">${t.side.toUpperCase()}</b> ${t.rationale}</span>
-      <span class="gpe up">${(t.confidence*100).toFixed(0)}%</span></div>`).join("")+`</div>`).join("");
+    g.takes.map(t=>{
+      const legs=(t.legs||[]).map(l=>`<span class="leg"><b class="${l.side=='yes'?'up':'down'}">${l.side.toUpperCase()}</b> ${l.label} @ ${Math.round((l.price||0)*100)}¢</span>`).join(' <span class="dim">+</span> ');
+      const pt=(t.play_type||'single').toUpperCase();
+      const ptc=pt=='PARLAY'?'pt-parlay':pt=='HEDGE'?'pt-hedge':'pt-single';
+      return `<div class="gpick"><span class="mtype">${t.analyst}</span>
+      <span class="gp"><span class="ptag ${ptc}">${pt}</span> ${t.rationale}<br>${legs}</span>
+      <span class="gpe up">${(t.confidence*100).toFixed(0)}%</span></div>`;
+    }).join("")+`</div>`).join("");
   el.innerHTML=html;
   const gb=$("#genana");
   if(gb) gb.onclick=async()=>{ gb.textContent="✨ Generating… (up to a minute)";

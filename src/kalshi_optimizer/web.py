@@ -190,14 +190,24 @@ def api_analysts() -> dict:
 
     conn = storage.connect()
     lb = grade_and_leaderboard(conn)
-    games: dict[str, dict] = {}
+    # Group pending legs into plays, then plays into games.
+    plays: dict[str, dict] = {}
     for p in storage.list_analyst_picks(conn):
         if p["status"] != "pending":
             continue
-        g = games.setdefault(p["game_key"], {"game_key": p["game_key"],
-                                             "label": p["game_label"], "sport": p["sport"], "takes": []})
-        g["takes"].append({"analyst": p["analyst"], "side": p["side"], "price": p["price"],
-                           "confidence": p["confidence"], "rationale": p["rationale"]})
+        pid = p["play_id"] or f"legacy-{p['id']}"
+        play = plays.setdefault(pid, {
+            "analyst": p["analyst"], "game_key": p["game_key"], "label": p["game_label"],
+            "sport": p["sport"], "play_type": p["play_type"] or "single",
+            "confidence": p["confidence"], "rationale": p["rationale"], "legs": []})
+        play["legs"].append({"label": p["leg_label"] or p["market_id"],
+                             "side": p["side"], "price": p["price"], "stake": p["stake"]})
+    games: dict[str, dict] = {}
+    for play in plays.values():
+        g = games.setdefault(play["game_key"], {"game_key": play["game_key"],
+                                                "label": play["label"], "sport": play["sport"],
+                                                "takes": []})
+        g["takes"].append(play)
     return {"games": list(games.values()), "leaderboard": lb["leaderboard"],
             "provider": provider_name(Config.load().secrets)}
 

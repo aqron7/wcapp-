@@ -55,10 +55,28 @@ CREATE TABLE IF NOT EXISTS analyst_picks (
     ts          TEXT, date TEXT, sport TEXT, analyst TEXT,
     game_key    TEXT, game_label TEXT,
     market_id   TEXT, side TEXT, price REAL, confidence REAL, rationale TEXT,
-    status      TEXT DEFAULT 'pending', result TEXT, pnl REAL
+    status      TEXT DEFAULT 'pending', result TEXT, pnl REAL,
+    play_id     TEXT, play_type TEXT, role TEXT, stake REAL, leg_label TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_apick_analyst ON analyst_picks(analyst);
 """
+
+# Columns added after the table first shipped; ALTER-in for existing DBs.
+_APICK_ADDED = [("play_id", "TEXT"), ("play_type", "TEXT"), ("role", "TEXT"),
+                ("stake", "REAL"), ("leg_label", "TEXT")]
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    have = {r[1] for r in conn.execute("PRAGMA table_info(analyst_picks)")}
+    for name, ddl in _APICK_ADDED:
+        if name not in have:
+            conn.execute(f"ALTER TABLE analyst_picks ADD COLUMN {name} {ddl}")
+    # Legacy single-market picks become one-leg single plays so grading still works.
+    conn.execute("UPDATE analyst_picks SET play_id='legacy-'||id WHERE play_id IS NULL")
+    conn.execute("UPDATE analyst_picks SET play_type='single' WHERE play_type IS NULL")
+    conn.execute("UPDATE analyst_picks SET stake=1.0 WHERE stake IS NULL")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_apick_play ON analyst_picks(play_id)")
+    conn.commit()
 
 
 def connect(db_path: str = DEFAULT_DB) -> sqlite3.Connection:
@@ -66,6 +84,7 @@ def connect(db_path: str = DEFAULT_DB) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
 
 
@@ -121,7 +140,8 @@ def result_for_market(conn: sqlite3.Connection, market_id: str) -> str | None:
 
 def insert_analyst_pick(conn: sqlite3.Connection, p: dict) -> int:
     cols = ("ts", "date", "sport", "analyst", "game_key", "game_label",
-            "market_id", "side", "price", "confidence", "rationale")
+            "market_id", "side", "price", "confidence", "rationale",
+            "play_id", "play_type", "role", "stake", "leg_label")
     cur = conn.execute(
         f"INSERT INTO analyst_picks ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
         tuple(p.get(c) for c in cols),
