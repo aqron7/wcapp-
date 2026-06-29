@@ -66,6 +66,23 @@ def _pick(**kw):
     return base
 
 
+def test_build_packets_horizon_filters_future_games():
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    today = (now + timedelta(hours=3)).isoformat()
+    next_week = (now + timedelta(days=6)).isoformat()
+    quotes = [
+        MarketQuote("kalshi", "KXWCGAME-TODAY-ESP", "A vs B Winner?", 0.5, 0.52,
+                    sport="soccer", event_key="KXWCGAME-TODAY", outcome="ESP",
+                    market_type="winner", game_time=today),
+        MarketQuote("kalshi", "KXWCGAME-LATER-FRA", "C vs D Winner?", 0.5, 0.52,
+                    sport="soccer", event_key="KXWCGAME-LATER", outcome="FRA",
+                    market_type="winner", game_time=next_week),
+    ]
+    packets = analysts.build_packets(quotes, "soccer", horizon_hours=30.0)
+    assert set(packets) == {"TODAY"}   # next week's game excluded
+
+
 def test_grade_single_play(tmp_path):
     conn = storage.connect(str(tmp_path / "a.db"))
     storage.insert_snapshots(conn, [

@@ -190,10 +190,15 @@ def api_analysts() -> dict:
 
     conn = storage.connect()
     lb = grade_and_leaderboard(conn)
+    rows = storage.list_analyst_picks(conn)
+    # Only show the most recent generation's pending plays (today's slate), so
+    # stale picks from earlier runs don't clutter the tab.
+    pending = [p for p in rows if p["status"] == "pending"]
+    latest = max((p["date"] for p in pending if p["date"]), default=None)
     # Group pending legs into plays, then plays into games.
     plays: dict[str, dict] = {}
-    for p in storage.list_analyst_picks(conn):
-        if p["status"] != "pending":
+    for p in pending:
+        if latest and p["date"] != latest:
             continue
         pid = p["play_id"] or f"legacy-{p['id']}"
         play = plays.setdefault(pid, {

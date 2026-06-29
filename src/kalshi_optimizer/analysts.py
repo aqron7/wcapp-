@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .engine.value import predictions_with_context
 from .providers import llm_complete
@@ -37,8 +37,25 @@ def _game_key(event_ticker: str) -> str:
     return event_ticker.split("-", 1)[1] if "-" in event_ticker else event_ticker
 
 
-def build_packets(quotes: list[MarketQuote], sport: str, min_price: float = 0.05) -> dict[str, dict]:
-    """Per game: a label + candidate markets (id, description, price, model fair)."""
+def _starts_within(game_time_iso: str | None, hours: float, now=None) -> bool:
+    """True if the game starts within the next ``hours`` (today's slate)."""
+    if not game_time_iso:
+        return True   # unknown time -> don't exclude
+    try:
+        dt = datetime.fromisoformat(game_time_iso.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    now = now or datetime.now(timezone.utc)
+    return dt <= now + timedelta(hours=hours)
+
+
+def build_packets(quotes: list[MarketQuote], sport: str, min_price: float = 0.05,
+                  horizon_hours: float | None = None) -> dict[str, dict]:
+    """Per game: a label + candidate markets (id, description, price, model fair).
+
+    With ``horizon_hours`` set, only games starting within that window are kept
+    (the day's slate), so the analysts don't opine on games days out.
+    """
     fair = {(p.event_key, p.outcome): p.fair_prob for p in predictions_with_context(sport, quotes)}
     games: dict[str, dict] = {}
     for q in quotes:
@@ -46,12 +63,16 @@ def build_packets(quotes: list[MarketQuote], sport: str, min_price: float = 0.05
             continue
         if not q.yes_bid or not q.yes_ask or not (min_price <= (q.yes_mid or 0) <= 1 - min_price):
             continue
+        if horizon_hours is not None and not _starts_within(q.game_time, horizon_hours):
+            continue
         gk = _game_key(q.event_key)
-        g = games.setdefault(gk, {"game_key": gk, "sport": sport, "label": None, "markets": []})
+        g = games.setdefault(gk, {"game_key": gk, "sport": sport, "label": None,
+                                  "game_time": q.game_time, "markets": []})
         if q.market_type == "winner" and not g["label"]:
             g["label"] = q.title.split(" Winner")[0]
         g["markets"].append({
             "market_id": q.market_id,
+            "type": q.market_type or "winner",
             "desc": f"{q.title} [{q.outcome_label or q.outcome}]",
             "price": round(q.yes_mid, 2),
             "fair": round(fair.get((q.event_key, q.outcome), 0.0), 2),
@@ -71,36 +92,43 @@ def build_panel_prompt(personas: dict[str, str], packets: list[dict]) -> str:
     """
     blocks = []
     for pk in packets:
-        lines = "\n".join(f"  - {m['market_id']} | {m['desc']} | price {m['price']} | model_fair {m['fair']}"
-                          for m in pk["markets"][:10])
+        lines = "\n".join(
+            f"  - {m['market_id']} | [{m['type']}] {m['desc']} | price {m['price']} | model_fair {m['fair']}"
+            for m in pk["markets"][:14])
         blocks.append(f"GAME {pk['game_key']}: {pk['label']} ({pk['sport']})\n{lines}")
     roster = "\n".join(f"- {name}: {desc}" for name, desc in personas.items())
     return (
         "You are a panel of distinct sports-betting analysts. Each has a perspective:\n"
         f"{roster}\n\n"
-        "Today's games and the markets available for each "
-        "(market_id | description | price | model_fair). "
+        "Today's games and the markets available for each. Market types in [brackets]: "
+        "winner (who wins), total (over/under goals or runs), spread (margin), "
+        "btts (both teams score), prop (a player's strikeouts / home runs / hits). "
+        "Format: market_id | [type] description | price | model_fair. "
         "price is the cost of YES; betting \"no\" costs (1 - price):\n\n"
         + "\n\n".join(blocks) + "\n\n"
-        "For EACH analyst, build their best plays for this slate. For any game an "
-        "analyst likes, give ONE play with a play_type:\n"
-        '- "parlay": 2+ legs (markets, even across games) that all must win, for a '
-        "bigger payout — use only with real conviction on each leg.\n"
-        '- "single": one leg.\n'
-        '- "hedge": a main leg PLUS a smaller insurance leg on a different or '
-        "opposing outcome, so if the main loses the insurance cushions it and you "
-        "don't lose much, while a main win still nets a profit.\n"
-        "Skip games an analyst has no edge on. Each leg is "
-        '{"market_id","side","stake"} where side is "yes" or "no" and stake is a '
-        "relative weight 0-1 (parlay: use 1 for every leg; hedge: main larger, e.g. "
-        "0.7, insurance smaller, e.g. 0.3).\n"
-        "In the rationale, NAME the actual bet in plain words (e.g. \"take the over "
-        "2.5 goals and Spain to win\" or \"back the Yankees but insure with the "
-        "under\"), don't just cite ids.\n"
+        "For EACH analyst, build their best plays for this slate. For every game an "
+        "analyst has a read on, give ONE concrete play (skip games with no edge). "
+        "Each play has a play_type:\n"
+        '- "parlay": 2+ legs that all must win, for a bigger payout. Build these by '
+        "combining a game with a complementary market or prop you also believe — e.g. "
+        "a winner WITH a total (over/under), or a pitcher's strikeout prop, or both "
+        "teams to score. Use only when you have real conviction on EVERY leg.\n"
+        '- "single": one leg, when you like just one market.\n'
+        '- "hedge": a main leg PLUS a smaller insurance leg on a different or opposing '
+        "outcome, so if the main loses the insurance cushions it and a main win still "
+        "profits.\n"
+        "Each leg is "
+        '{"market_id","side","stake"} — side is "yes" or "no", stake is a relative '
+        "weight 0-1 (parlay: 1 for every leg; hedge: main larger e.g. 0.7, insurance "
+        "smaller e.g. 0.3).\n"
+        "Write the rationale as a specific instruction that NAMES each bet in plain "
+        "words and says why — e.g. \"Take Spain to win and the over 2.5 goals; Spain's "
+        "attack should overwhelm a leaky defense\" or \"Back the Yankees moneyline and "
+        "Cole over 6.5 strikeouts as a parlay\". Never reply with only a bare yes/no.\n"
         "Reply ONLY with a JSON array of plays: "
         '[{"analyst":"<exact name>","play_type":"single|parlay|hedge",'
         '"legs":[{"market_id":"<id>","side":"yes","stake":1}],'
-        '"confidence":0.0-1.0,"rationale":"one or two sentences"}]. '
+        '"confidence":0.0-1.0,"rationale":"a specific sentence or two naming the bets"}]. '
         "Use analyst names and market_id values exactly as listed."
     )
 
@@ -257,11 +285,15 @@ def grade_and_leaderboard(conn) -> dict:
 
 
 def generate_takes(quotes: list[MarketQuote], sport: str, secrets,
-                   personas: list[str] | None = None, max_games: int = 8) -> list[dict]:
-    """One LLM call for the whole panel; return per-leg rows grouped into plays."""
+                   personas: list[str] | None = None, max_games: int = 8,
+                   horizon_hours: float = 30.0) -> list[dict]:
+    """One LLM call for the whole panel; return per-leg rows grouped into plays.
+
+    Only games starting within ``horizon_hours`` (the day's slate) are considered.
+    """
     import uuid
 
-    packets = list(build_packets(quotes, sport).values())[:max_games]
+    packets = list(build_packets(quotes, sport, horizon_hours=horizon_hours).values())[:max_games]
     if not packets:
         return []
     chosen = personas or list(PERSONAS)

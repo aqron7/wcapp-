@@ -284,8 +284,8 @@ def cmd_analysts(config: Config, sport: str) -> None:
     from .providers import llm_complete
 
     quotes = KalshiClient(config.secrets).get_sports_markets(sport)
-    packets = build_packets(quotes, sport)
-    console.print(f"{len(quotes)} markets -> {len(packets)} games with tradeable candidate markets "
+    packets = build_packets(quotes, sport, horizon_hours=30.0)
+    console.print(f"{len(quotes)} markets -> {len(packets)} games on today's slate "
                   f"(engine: {provider_name(config.secrets)})")
     if not packets:
         console.print("[yellow]No live games with liquid, non-decided markets right now.[/yellow]")
