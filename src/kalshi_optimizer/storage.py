@@ -67,10 +67,14 @@ _APICK_ADDED = [("play_id", "TEXT"), ("play_type", "TEXT"), ("role", "TEXT"),
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
+    """Add the play columns once. A no-op (read-only) once they exist, so it's
+    safe to call on every connect() without taking SQLite's write lock."""
     have = {r[1] for r in conn.execute("PRAGMA table_info(analyst_picks)")}
-    for name, ddl in _APICK_ADDED:
-        if name not in have:
-            conn.execute(f"ALTER TABLE analyst_picks ADD COLUMN {name} {ddl}")
+    missing = [(n, d) for n, d in _APICK_ADDED if n not in have]
+    if not missing:
+        return  # already migrated — do not write on every connect
+    for name, ddl in missing:
+        conn.execute(f"ALTER TABLE analyst_picks ADD COLUMN {name} {ddl}")
     # Legacy single-market picks become one-leg single plays so grading still works.
     conn.execute("UPDATE analyst_picks SET play_id='legacy-'||id WHERE play_id IS NULL")
     conn.execute("UPDATE analyst_picks SET play_type='single' WHERE play_type IS NULL")
@@ -81,8 +85,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
 
 def connect(db_path: str = DEFAULT_DB) -> sqlite3.Connection:
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
     conn.row_factory = sqlite3.Row
+    # WAL lets the WS snapshot writer and the dashboard's readers run concurrently
+    # instead of blocking each other; busy_timeout avoids instant "database is locked".
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=10000")
     conn.executescript(SCHEMA)
     _migrate(conn)
     return conn
