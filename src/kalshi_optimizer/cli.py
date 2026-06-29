@@ -409,16 +409,36 @@ def cmd_dashboard(config: Config) -> None:
     uvicorn.run("kalshi_optimizer.web:app", host="127.0.0.1", port=8000, log_level="warning")
 
 
-def cmd_snapshot(config: Config) -> None:
-    """Record one snapshot of live prices + model fair values to the DB."""
+def cmd_snapshot(config: Config, loop_minutes: float = 0.0) -> None:
+    """Record live prices + model fair values to the DB.
+
+    With ``loop_minutes`` > 0, keep snapshotting on that interval (Ctrl+C to
+    stop) so entry/closing prices and results accumulate for CLV.
+    """
+    import time
+    from datetime import datetime
     from .logger import run_snapshot
 
-    try:
-        n = run_snapshot(config)
-    except Exception as exc:  # noqa: BLE001
-        console.print(f"[yellow]snapshot failed:[/yellow] {exc}")
+    def once() -> None:
+        try:
+            n = run_snapshot(config)
+            stamp = datetime.now().strftime("%H:%M:%S")
+            console.print(f"[{stamp}] recorded [bold]{n}[/bold] market rows to data/snapshots.db")
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"[yellow]snapshot failed:[/yellow] {exc}")
+
+    if loop_minutes <= 0:
+        once()
         return
-    console.print(f"Recorded [bold]{n}[/bold] market rows to data/snapshots.db")
+
+    console.print(f"Snapshotting every {loop_minutes:g} min. Leave this running "
+                  f"(minimize it — it won't steal focus). Ctrl+C to stop.")
+    try:
+        while True:
+            once()
+            time.sleep(loop_minutes * 60)
+    except KeyboardInterrupt:
+        console.print("Stopped.")
 
 
 def cmd_backtest(config: Config) -> None:
@@ -459,7 +479,9 @@ def main() -> None:
     p_ana.add_argument("sport", help="sport key, e.g. mlb or soccer")
     sub.add_parser("auth-check", help="verify Kalshi API auth on a private endpoint")
     sub.add_parser("dashboard", help="launch the web dashboard (phase 5)")
-    sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
+    p_snap = sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
+    p_snap.add_argument("--loop", type=float, default=0.0, metavar="MIN",
+                        help="keep snapshotting every MIN minutes (e.g. --loop 60)")
     sub.add_parser("backtest", help="validation gate report (phase 3)")
     p_discover = sub.add_parser("discover", help="find Kalshi series tickers by keyword")
     p_discover.add_argument("term", help="search term, e.g. 'world cup' or soccer")
@@ -491,6 +513,10 @@ def main() -> None:
         cmd_analysts(config, args.sport)
         return
 
+    if args.command == "snapshot":
+        cmd_snapshot(config, loop_minutes=args.loop)
+        return
+
     {
         "scan-arb": cmd_scan_arb,
         "demo-arb": cmd_demo_arb,
@@ -498,7 +524,6 @@ def main() -> None:
         "demo-edges": cmd_demo_edges,
         "auth-check": cmd_auth_check,
         "dashboard": cmd_dashboard,
-        "snapshot": cmd_snapshot,
         "backtest": cmd_backtest,
     }[args.command](config)
 
