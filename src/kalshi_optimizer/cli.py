@@ -454,6 +454,7 @@ def cmd_backtest(config: Config) -> None:
         )
         return
     armed = getattr(config.edge, "tradeable_types", None) or None
+    min_clv = getattr(config.edge, "kalshi_fee", 0.01)  # CLV must beat round-trip cost
     table = Table(title="Backtest / validation gate")
     table.add_column("metric")
     table.add_column("value", justify="right")
@@ -466,7 +467,7 @@ def cmd_backtest(config: Config) -> None:
         a = armed_score_from_db(armed, min_edge=config.edge.min_edge)
         table.add_row(f"armed types", ", ".join(armed))
         table.add_row("armed mean CLV", f"{a.mean_clv * 100:+.2f}%  (n={a.n})" if a.n else "— (no data)")
-        table.add_row("ARMED GATE", "✅ yes" if a.passes_bucket_gate() else "❌ not yet")
+        table.add_row("ARMED GATE", "✅ yes" if a.passes_bucket_gate(min_clv=min_clv) else "❌ not yet")
     console.print(table)
 
     # Where the edge actually lives — split by sport and by market type.
@@ -480,10 +481,11 @@ def cmd_backtest(config: Config) -> None:
         bt.add_column("gate", justify="center")
         for label, r in breakdown:
             clv = f"{r.mean_clv * 100:+.2f}%" if r.n else "—"
-            gate = "✅" if r.passes_bucket_gate() else ("·" if r.n < 100 else "❌")
+            gate = "✅" if r.passes_bucket_gate(min_clv=min_clv) else ("·" if r.n < 100 else "❌")
             bt.add_row(label, str(r.n), f"{r.brier:.3f}", clv, gate)
         console.print(bt)
-        console.print("[dim]gate: ✅ armed (n≥100, CLV>0, Brier<0.25)  ·  · = too few samples yet[/dim]")
+        console.print(f"[dim]gate: ✅ armed (n≥100, CLV>{min_clv*100:.0f}% cost, Brier<0.25)"
+                      "  ·  · = too few samples yet[/dim]")
     if not armed:
         console.print("[dim]Tip: set edge.tradeable_types in config.yaml (e.g. [total, spread]) "
                       "to restrict recommendations/execution to validated markets.[/dim]")

@@ -41,6 +41,19 @@ def test_grouped_breakdown_splits_by_sport_and_type(tmp_path):
     assert round(groups["soccer/winner"].mean_clv, 2) == 0.15
 
 
+def test_bucket_gate_requires_clv_above_cost():
+    from kalshi_optimizer.backtest.backtester import BacktestResult
+    # Like mlb/prop: big sample, calibrated, but CLV below the ~1% fee -> not armed.
+    flat = BacktestResult(n=1028, brier=0.184, log_loss=0.5, mean_clv=0.0008)
+    assert not flat.passes_bucket_gate(min_clv=0.01)
+    # Like mlb/spread: clears samples, calibration, and beats cost -> armed.
+    edge = BacktestResult(n=136, brier=0.130, log_loss=0.5, mean_clv=0.0319)
+    assert edge.passes_bucket_gate(min_clv=0.01)
+    # Too few samples never arms, however large the CLV.
+    tiny = BacktestResult(n=43, brier=0.20, log_loss=0.5, mean_clv=0.12)
+    assert not tiny.passes_bucket_gate(min_clv=0.01)
+
+
 def test_empty_db_is_zero(tmp_path):
     db = str(tmp_path / "empty.db")
     storage.connect(db)

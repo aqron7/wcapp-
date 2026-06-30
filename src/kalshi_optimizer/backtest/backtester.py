@@ -52,12 +52,13 @@ class BacktestResult:
         """Conservative gate: positive CLV and a calibrated Brier score."""
         return self.mean_clv > 0 and self.brier < 0.25
 
-    def passes_bucket_gate(self, min_n: int = 100) -> bool:
-        """Per-bucket gate: the full gate plus enough settled samples to trust it.
+    def passes_bucket_gate(self, min_n: int = 100, min_clv: float = 0.01) -> bool:
+        """Per-bucket gate: calibrated, enough samples, and CLV above trading cost.
 
-        A big CLV on a tiny, correlated sample is noise, so a bucket isn't
-        considered armed until it has cleared ``min_n``."""
-        return self.n >= min_n and self.passes_gate
+        A big CLV on a tiny, correlated sample is noise (hence ``min_n``), and a
+        market that only beats the close by less than the round-trip fee+spread is
+        a money-loser despite "positive" CLV (hence ``min_clv``, default ~1%)."""
+        return self.n >= min_n and self.brier < 0.25 and self.mean_clv > min_clv
 
 
 def run_backtest(
