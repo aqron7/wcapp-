@@ -1,7 +1,7 @@
 """Tests for snapshot storage and backtester DB scoring (phase 3)."""
 
 from kalshi_optimizer import storage
-from kalshi_optimizer.backtest.backtester import score_from_db
+from kalshi_optimizer.backtest.backtester import grouped_score_from_db, score_from_db
 
 
 def _seed(path):
@@ -29,6 +29,16 @@ def test_score_from_db_computes_clv_and_brier(tmp_path):
     assert round(result.mean_clv, 2) == 0.15
     # Model said 0.75, outcome YES(1): Brier = 0.0625.
     assert round(result.brier, 4) == 0.0625
+
+
+def test_grouped_breakdown_splits_by_sport_and_type(tmp_path):
+    db = str(tmp_path / "snap.db")
+    _seed(db)
+    groups = dict(grouped_score_from_db(db_path=db, min_edge=0.03))
+    # The one edge market is soccer, default market type 'winner'.
+    assert groups["soccer"].n == 1
+    assert groups["soccer/winner"].n == 1
+    assert round(groups["soccer/winner"].mean_clv, 2) == 0.15
 
 
 def test_empty_db_is_zero(tmp_path):

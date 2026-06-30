@@ -443,7 +443,7 @@ def cmd_snapshot(config: Config, loop_minutes: float = 0.0) -> None:
 
 def cmd_backtest(config: Config) -> None:
     """Score the model against accumulated snapshot history (the gate)."""
-    from .backtest.backtester import score_from_db
+    from .backtest.backtester import grouped_score_from_db, score_from_db
 
     result = score_from_db(min_edge=config.edge.min_edge)
     if result.n == 0:
@@ -461,6 +461,20 @@ def cmd_backtest(config: Config) -> None:
     table.add_row("mean CLV", f"{result.mean_clv * 100:+.2f}%  (want > 0)")
     table.add_row("PASSES GATE", "✅ yes" if result.passes_gate else "❌ not yet")
     console.print(table)
+
+    # Where the edge actually lives — split by sport and by market type.
+    breakdown = grouped_score_from_db(min_edge=config.edge.min_edge)
+    if breakdown:
+        bt = Table(title="Breakdown by sport / market type")
+        bt.add_column("group")
+        bt.add_column("n", justify="right")
+        bt.add_column("Brier", justify="right")
+        bt.add_column("mean CLV", justify="right")
+        for label, r in breakdown:
+            clv = f"{r.mean_clv * 100:+.2f}%" if r.n else "—"
+            bt.add_row(label, str(r.n), f"{r.brier:.3f}", clv)
+        console.print(bt)
+        console.print("[dim]Small per-group n is noisy; trust groups with many settled games.[/dim]")
 
 
 def main() -> None:

@@ -68,37 +68,37 @@ def run_backtest(
     )
 
 
-def score_from_db(db_path: str | None = None, min_edge: float = 0.03) -> BacktestResult:
-    """Build the validation report from the snapshot DB.
+def _scored_rows(db_path: str | None = None, min_edge: float = 0.03) -> list[dict]:
+    """Per-market scored rows: each has sport, market_type, prob, outcome,
+    entry/closing price (bought-side). Shared by overall + grouped scoring.
 
     For each market it derives an entry (first liquid snapshot with a model
     fair value), a closing price (last liquid snapshot), and the settled
     result. Only markets where the model had an edge >= ``min_edge`` at entry
-    count toward the score. Prices are expressed in terms of the side we'd have
-    bought, so positive mean CLV means our entry beat the closing line.
+    are kept. Prices are in terms of the side we'd have bought, so positive
+    mean CLV means our entry beat the closing line.
     """
     from collections import defaultdict
 
     from .. import storage
+    from ..data.kalshi import SERIES_TYPE
 
     conn = storage.connect(db_path or storage.DEFAULT_DB)
     cur = conn.execute(
-        "SELECT market_id, ts, yes_bid, yes_ask, model_fair, status, result "
+        "SELECT market_id, sport, ts, yes_bid, yes_ask, model_fair, status, result "
         "FROM snapshots ORDER BY ts"
     )
-    markets: dict[str, dict] = defaultdict(lambda: {"entries": [], "result": None})
-    for market_id, ts, yes_bid, yes_ask, fair, status, result in cur:
+    markets: dict[str, dict] = defaultdict(lambda: {"entries": [], "result": None, "sport": None})
+    for market_id, sport, ts, yes_bid, yes_ask, fair, status, result in cur:
         m = markets[market_id]
+        m["sport"] = sport or m["sport"]
         if status == "settled" and result in ("yes", "no"):
             m["result"] = result
         elif status == "active" and yes_bid is not None and yes_ask is not None and fair is not None:
             m["entries"].append((ts, (yes_bid + yes_ask) / 2.0, fair))
 
-    probs: list[float] = []
-    outcomes: list[int] = []
-    entry_prices: list[float] = []
-    closing_prices: list[float] = []
-    for m in markets.values():
+    rows: list[dict] = []
+    for market_id, m in markets.items():
         if m["result"] is None or not m["entries"]:
             continue
         m["entries"].sort()
@@ -107,10 +107,40 @@ def score_from_db(db_path: str | None = None, min_edge: float = 0.03) -> Backtes
         if abs(fair - entry_yes) < min_edge:
             continue  # we wouldn't have bet this market
         bet_yes = fair >= entry_yes
-        probs.append(fair)
-        outcomes.append(1 if m["result"] == "yes" else 0)
-        # Express prices for the side we bought (YES price, or the NO price).
-        entry_prices.append(entry_yes if bet_yes else 1.0 - entry_yes)
-        closing_prices.append(closing_yes if bet_yes else 1.0 - closing_yes)
+        rows.append({
+            "sport": m["sport"] or "?",
+            "market_type": SERIES_TYPE.get(market_id.split("-", 1)[0], "winner"),
+            "prob": fair,
+            "outcome": 1 if m["result"] == "yes" else 0,
+            "entry": entry_yes if bet_yes else 1.0 - entry_yes,
+            "close": closing_yes if bet_yes else 1.0 - closing_yes,
+        })
+    return rows
 
-    return run_backtest(probs, outcomes, entry_prices, closing_prices)
+
+def _result_from_rows(rows: list[dict]) -> BacktestResult:
+    return run_backtest([r["prob"] for r in rows], [r["outcome"] for r in rows],
+                        [r["entry"] for r in rows], [r["close"] for r in rows])
+
+
+def score_from_db(db_path: str | None = None, min_edge: float = 0.03) -> BacktestResult:
+    """Overall validation report from the snapshot DB (the gate)."""
+    return _result_from_rows(_scored_rows(db_path, min_edge))
+
+
+def grouped_score_from_db(db_path: str | None = None,
+                          min_edge: float = 0.03) -> list[tuple[str, BacktestResult]]:
+    """(label, result) per sport and per sport/market-type, for the breakdown.
+
+    Sorted by sample size so the most-supported groups read first.
+    """
+    from collections import defaultdict
+
+    rows = _scored_rows(db_path, min_edge)
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        groups[r["sport"]].append(r)
+        groups[f"{r['sport']}/{r['market_type']}"].append(r)
+    out = [(label, _result_from_rows(rs)) for label, rs in groups.items()]
+    out.sort(key=lambda x: x[1].n, reverse=True)
+    return out
