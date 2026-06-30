@@ -444,7 +444,7 @@ def cmd_snapshot(config: Config, loop_minutes: float = 0.0) -> None:
 def cmd_backtest(config: Config) -> None:
     """Score the model against accumulated snapshot history (the gate)."""
     from .backtest.backtester import (armed_score_from_db, grouped_score_from_db,
-                                      score_from_db)
+                                      realized_from_db, score_from_db)
 
     result = score_from_db(min_edge=config.edge.min_edge)
     if result.n == 0:
@@ -486,6 +486,22 @@ def cmd_backtest(config: Config) -> None:
         console.print(bt)
         console.print(f"[dim]gate: ✅ armed (n≥100, CLV>{min_clv*100:.0f}% cost, Brier<0.25)"
                       "  ·  · = too few samples yet[/dim]")
+
+    # Realized return: what flat bets would actually have made at the ask, net of
+    # fees — the number that predicts your bankroll, vs the optimistic mid CLV.
+    rr = realized_from_db(armed, min_edge=config.edge.min_edge, fee=min_clv)
+    if rr.get("n"):
+        scope = ("armed (" + ", ".join(armed) + ")") if armed else "all scored markets"
+        rt = Table(title=f"Realized return per $1 risked — {scope}")
+        rt.add_column("fill")
+        rt.add_column("ROI/bet", justify="right")
+        rt.add_row("at mid (optimistic)", f"{rr['roi_mid'] * 100:+.2f}%")
+        rt.add_row("at ask (real fill)", f"{rr['roi_ask'] * 100:+.2f}%")
+        rt.add_row(f"at ask − {min_clv*100:.0f}% fee (net)", f"{rr['roi_net'] * 100:+.2f}%")
+        rt.add_row("avg spread paid", f"{rr['avg_spread'] * 100:.2f}%")
+        rt.add_row("win rate / n", f"{rr['win_rate']*100:.0f}%  /  {rr['n']}")
+        console.print(rt)
+        console.print("[dim]Net ROI/bet is the honest expectation; mid-fill flatters it by the spread.[/dim]")
     if not armed:
         console.print("[dim]Tip: set edge.tradeable_types in config.yaml (e.g. [total, spread]) "
                       "to restrict recommendations/execution to validated markets.[/dim]")

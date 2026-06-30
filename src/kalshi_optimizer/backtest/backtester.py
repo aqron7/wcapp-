@@ -103,27 +103,74 @@ def _scored_rows(db_path: str | None = None, min_edge: float = 0.03) -> list[dic
         if status == "settled" and result in ("yes", "no"):
             m["result"] = result
         elif status == "active" and yes_bid is not None and yes_ask is not None and fair is not None:
-            m["entries"].append((ts, (yes_bid + yes_ask) / 2.0, fair))
+            # keep bid/ask (not just mid) so realized fills at the ask are scorable
+            m["entries"].append((ts, yes_bid, yes_ask, fair))
 
     rows: list[dict] = []
     for market_id, m in markets.items():
         if m["result"] is None or not m["entries"]:
             continue
         m["entries"].sort()
-        _, entry_yes, fair = m["entries"][0]
-        _, closing_yes, _ = m["entries"][-1]
-        if abs(fair - entry_yes) < min_edge:
+        _, e_bid, e_ask, fair = m["entries"][0]
+        _, c_bid, c_ask, _ = m["entries"][-1]
+        entry_mid = (e_bid + e_ask) / 2.0
+        closing_mid = (c_bid + c_ask) / 2.0
+        if abs(fair - entry_mid) < min_edge:
             continue  # we wouldn't have bet this market
-        bet_yes = fair >= entry_yes
+        bet_yes = fair >= entry_mid
+        outcome_yes = m["result"] == "yes"
         rows.append({
             "sport": m["sport"] or "?",
             "market_type": SERIES_TYPE.get(market_id.split("-", 1)[0], "winner"),
             "prob": fair,
-            "outcome": 1 if m["result"] == "yes" else 0,
-            "entry": entry_yes if bet_yes else 1.0 - entry_yes,
-            "close": closing_yes if bet_yes else 1.0 - closing_yes,
+            "outcome": 1 if outcome_yes else 0,
+            # bought-side prices: mid for CLV, ask for the price actually paid
+            "entry": entry_mid if bet_yes else 1.0 - entry_mid,
+            "close": closing_mid if bet_yes else 1.0 - closing_mid,
+            "fill_ask": e_ask if bet_yes else 1.0 - e_bid,
+            "won": outcome_yes if bet_yes else not outcome_yes,
         })
     return rows
+
+
+def realized_returns(rows: list[dict], fee: float = 0.01) -> dict:
+    """What flat $1-risked bets would actually have returned.
+
+    Compares filling at the mid (optimistic, what CLV implies) vs the ask (what
+    you really pay), then nets the ask fill of a per-bet ``fee``. ROI is profit
+    per $1 risked: a win pays 1/price - 1, a loss is -1.
+    """
+    if not rows:
+        return {"n": 0}
+
+    def roi(price: float, won: bool) -> float:
+        if price <= 0:
+            return 0.0
+        return (1.0 / price - 1.0) if won else -1.0
+
+    mid = [roi(r["entry"], r["won"]) for r in rows]
+    ask = [roi(r["fill_ask"], r["won"]) for r in rows]
+    net = [a - fee for a in ask]
+    spreads = [r["fill_ask"] - r["entry"] for r in rows]
+    n = len(rows)
+    return {
+        "n": n,
+        "win_rate": sum(1 for r in rows if r["won"]) / n,
+        "roi_mid": sum(mid) / n,
+        "roi_ask": sum(ask) / n,
+        "roi_net": sum(net) / n,
+        "avg_spread": sum(spreads) / n,
+    }
+
+
+def realized_from_db(tradeable_types=None, db_path: str | None = None,
+                     min_edge: float = 0.03, fee: float = 0.01) -> dict:
+    """Realized-return summary over scored markets (optionally only armed types)."""
+    rows = _scored_rows(db_path, min_edge)
+    if tradeable_types:
+        allowed = set(tradeable_types)
+        rows = [r for r in rows if r["market_type"] in allowed]
+    return realized_returns(rows, fee)
 
 
 def _result_from_rows(rows: list[dict]) -> BacktestResult:
