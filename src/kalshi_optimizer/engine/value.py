@@ -318,6 +318,9 @@ def find_value_edges(
     gamma = getattr(config.edge, "model_sharpen", 1.0)
     do_devig = getattr(config.edge, "devig", True)
     min_price = getattr(config.edge, "min_price", 0.05)
+    # Only recommend/execute these market types (None/empty = all). Logging and
+    # backtest scoring still cover every market; this gates what we'd act on.
+    tradeable = getattr(config.edge, "tradeable_types", None) or None
     pred_index = {(p.event_key, p.outcome): p.fair_prob for p in predictions}
     market_probs = market_probs or {}
 
@@ -347,6 +350,8 @@ def find_value_edges(
             continue
         if q.yes_mid is None or not (min_price <= q.yes_mid <= 1.0 - min_price):
             continue  # near-decided / 0-chance market — skip
+        if tradeable and (q.market_type or "winner") not in tradeable:
+            continue  # not a validated/armed market type — don't act on it
         model_p = pred_index.get((q.event_key, q.outcome))
         if model_p is None:
             continue

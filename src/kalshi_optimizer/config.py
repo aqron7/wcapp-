@@ -31,6 +31,10 @@ class EdgeConfig:
     devig: bool = True          # remove the market's overround before comparing
     model_sharpen: float = 1.25  # >1 fixes model under-confidence; fit from results later
     min_price: float = 0.05     # skip near-decided markets (<=5c or >=95c) — no 0-chance picks
+    # Market types eligible for recommendations/execution. None/empty = all.
+    # Set to the buckets whose CLV has validated (e.g. ["total","spread"]) to stop
+    # acting on dead/noisy markets; everything is still logged for analysis.
+    tradeable_types: list[str] | None = None
 
 
 @dataclass

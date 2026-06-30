@@ -443,7 +443,8 @@ def cmd_snapshot(config: Config, loop_minutes: float = 0.0) -> None:
 
 def cmd_backtest(config: Config) -> None:
     """Score the model against accumulated snapshot history (the gate)."""
-    from .backtest.backtester import grouped_score_from_db, score_from_db
+    from .backtest.backtester import (armed_score_from_db, grouped_score_from_db,
+                                      score_from_db)
 
     result = score_from_db(min_edge=config.edge.min_edge)
     if result.n == 0:
@@ -452,6 +453,7 @@ def cmd_backtest(config: Config) -> None:
             "entry prices, closing prices, and settled results can accumulate."
         )
         return
+    armed = getattr(config.edge, "tradeable_types", None) or None
     table = Table(title="Backtest / validation gate")
     table.add_column("metric")
     table.add_column("value", justify="right")
@@ -459,7 +461,12 @@ def cmd_backtest(config: Config) -> None:
     table.add_row("Brier score", f"{result.brier:.4f}  (lower better, <0.25)")
     table.add_row("log loss", f"{result.log_loss:.4f}")
     table.add_row("mean CLV", f"{result.mean_clv * 100:+.2f}%  (want > 0)")
-    table.add_row("PASSES GATE", "✅ yes" if result.passes_gate else "❌ not yet")
+    table.add_row("PASSES GATE (all)", "✅ yes" if result.passes_gate else "❌ not yet")
+    if armed:
+        a = armed_score_from_db(armed, min_edge=config.edge.min_edge)
+        table.add_row(f"armed types", ", ".join(armed))
+        table.add_row("armed mean CLV", f"{a.mean_clv * 100:+.2f}%  (n={a.n})" if a.n else "— (no data)")
+        table.add_row("ARMED GATE", "✅ yes" if a.passes_bucket_gate() else "❌ not yet")
     console.print(table)
 
     # Where the edge actually lives — split by sport and by market type.
@@ -470,11 +477,16 @@ def cmd_backtest(config: Config) -> None:
         bt.add_column("n", justify="right")
         bt.add_column("Brier", justify="right")
         bt.add_column("mean CLV", justify="right")
+        bt.add_column("gate", justify="center")
         for label, r in breakdown:
             clv = f"{r.mean_clv * 100:+.2f}%" if r.n else "—"
-            bt.add_row(label, str(r.n), f"{r.brier:.3f}", clv)
+            gate = "✅" if r.passes_bucket_gate() else ("·" if r.n < 100 else "❌")
+            bt.add_row(label, str(r.n), f"{r.brier:.3f}", clv, gate)
         console.print(bt)
-        console.print("[dim]Small per-group n is noisy; trust groups with many settled games.[/dim]")
+        console.print("[dim]gate: ✅ armed (n≥100, CLV>0, Brier<0.25)  ·  · = too few samples yet[/dim]")
+    if not armed:
+        console.print("[dim]Tip: set edge.tradeable_types in config.yaml (e.g. [total, spread]) "
+                      "to restrict recommendations/execution to validated markets.[/dim]")
 
 
 def main() -> None:

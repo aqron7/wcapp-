@@ -65,3 +65,20 @@ def test_find_value_edges_ranks_dedups_and_sizes():
     assert idea.side is Side.YES
     assert idea.edge > 0.03
     assert 0 < idea.stake <= config.sizing.max_per_market
+
+
+def test_tradeable_types_filters_recommendations():
+    quotes = _quotes()
+    model = BaseballModel()
+    model.elo.ratings.update({"NYY": 1600, "BOS": 1450, "LAD": 1550, "SF": 1500})
+    preds = []
+    for ek, home, away in matchups_from_quotes(quotes, "mlb"):
+        preds += model.predict_matchup(ek, home, away)
+
+    config = Config()
+    # The only edge is a winner market; arming totals/spreads filters it out.
+    config.edge.tradeable_types = ["total", "spread"]
+    assert find_value_edges(quotes, preds, config) == []
+    # Arming winner (or leaving it unset) lets it through again.
+    config.edge.tradeable_types = ["winner"]
+    assert len(find_value_edges(quotes, preds, config)) == 1

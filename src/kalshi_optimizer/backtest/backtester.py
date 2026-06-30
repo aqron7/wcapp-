@@ -52,6 +52,13 @@ class BacktestResult:
         """Conservative gate: positive CLV and a calibrated Brier score."""
         return self.mean_clv > 0 and self.brier < 0.25
 
+    def passes_bucket_gate(self, min_n: int = 100) -> bool:
+        """Per-bucket gate: the full gate plus enough settled samples to trust it.
+
+        A big CLV on a tiny, correlated sample is noise, so a bucket isn't
+        considered armed until it has cleared ``min_n``."""
+        return self.n >= min_n and self.passes_gate
+
 
 def run_backtest(
     probs: list[float],
@@ -126,6 +133,17 @@ def _result_from_rows(rows: list[dict]) -> BacktestResult:
 def score_from_db(db_path: str | None = None, min_edge: float = 0.03) -> BacktestResult:
     """Overall validation report from the snapshot DB (the gate)."""
     return _result_from_rows(_scored_rows(db_path, min_edge))
+
+
+def armed_score_from_db(tradeable_types, db_path: str | None = None,
+                        min_edge: float = 0.03) -> BacktestResult:
+    """Gate scored over ONLY the armed market types — so props/winners don't
+    dilute the signal for the markets you'd actually trade. Empty/None = all."""
+    rows = _scored_rows(db_path, min_edge)
+    if tradeable_types:
+        allowed = set(tradeable_types)
+        rows = [r for r in rows if r["market_type"] in allowed]
+    return _result_from_rows(rows)
 
 
 def grouped_score_from_db(db_path: str | None = None,
