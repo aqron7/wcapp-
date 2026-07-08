@@ -32,6 +32,14 @@ def _auth(api_key: str) -> dict:
     return {"authorization": f"Apikey {api_key}"} if api_key else {}
 
 
+def _check(r: requests.Response) -> None:
+    """Raise a clear error for the common missing/bad-key case."""
+    if r.status_code in (401, 403):
+        raise RuntimeError("CoinDesk API rejected the request — set a free COINDESK_API_KEY "
+                           "in .env (get one at min-api.cryptocompare.com).")
+    r.raise_for_status()
+
+
 def fetch_news(api_key: str = "", lang: str = "EN", limit: int = 30,
                before_ts: int | None = None) -> list[Article]:
     """Crypto news articles, newest first. ``before_ts`` pages back in time."""
@@ -39,7 +47,7 @@ def fetch_news(api_key: str = "", lang: str = "EN", limit: int = 30,
     if before_ts:
         params["lTs"] = int(before_ts)   # articles published before this unix ts
     r = requests.get(NEWS_URL, params=params, headers=_auth(api_key), timeout=30)
-    r.raise_for_status()
+    _check(r)
     items = r.json().get("Data", [])[:limit]
     out: list[Article] = []
     for a in items:
@@ -59,7 +67,7 @@ def spot_price(symbol: str, api_key: str = "", quote: str = "USD") -> float | No
     """Current price of ``symbol`` (e.g. BTC) in ``quote``. None if unavailable."""
     r = requests.get(PRICE_URL, params={"fsym": symbol.upper(), "tsyms": quote.upper()},
                      headers=_auth(api_key), timeout=30)
-    r.raise_for_status()
+    _check(r)
     return r.json().get(quote.upper())
 
 
@@ -69,7 +77,7 @@ def fetch_hourly(symbol: str, api_key: str = "", quote: str = "USD",
     r = requests.get(HISTOHOUR_URL, headers=_auth(api_key), timeout=30,
                      params={"fsym": symbol.upper(), "tsym": quote.upper(),
                              "limit": min(2000, hours)})
-    r.raise_for_status()
+    _check(r)
     data = r.json().get("Data", {}).get("Data", [])
     return [(int(c["time"]), float(c["close"])) for c in data if c.get("close")]
 
