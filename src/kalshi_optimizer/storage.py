@@ -59,6 +59,23 @@ CREATE TABLE IF NOT EXISTS analyst_picks (
     play_id     TEXT, play_type TEXT, role TEXT, stake REAL, leg_label TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_apick_analyst ON analyst_picks(analyst);
+
+CREATE TABLE IF NOT EXISTS crypto_signals (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts            TEXT NOT NULL,          -- when flagged (ISO)
+    asset         TEXT NOT NULL,          -- ticker, e.g. BTC
+    direction     TEXT,                   -- up | down | neutral
+    magnitude     TEXT,                   -- small | medium | large
+    horizon_hours INTEGER,
+    confidence    REAL,
+    catalyst_type TEXT,
+    thesis        TEXT,
+    title         TEXT, url TEXT, source TEXT, published INTEGER,
+    entry_price   REAL,                   -- asset price when flagged
+    status        TEXT DEFAULT 'pending', -- pending | scored | skipped
+    price_after   REAL, move_pct REAL, correct INTEGER, scored_ts TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_csig_status ON crypto_signals(status);
 """
 
 # Columns added after the table first shipped; ALTER-in for existing DBs.
@@ -167,6 +184,30 @@ def update_analyst_pick(conn: sqlite3.Connection, pick_id: int, **fields) -> Non
         return
     sets = ", ".join(f"{k}=?" for k in fields)
     conn.execute(f"UPDATE analyst_picks SET {sets} WHERE id=?", (*fields.values(), pick_id))
+    conn.commit()
+
+
+def insert_crypto_signal(conn: sqlite3.Connection, s: dict) -> int:
+    cols = ("ts", "asset", "direction", "magnitude", "horizon_hours", "confidence",
+            "catalyst_type", "thesis", "title", "url", "source", "published",
+            "entry_price", "status")
+    cur = conn.execute(
+        f"INSERT INTO crypto_signals ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+        tuple(s.get(c) for c in cols),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def list_crypto_signals(conn: sqlite3.Connection) -> list[dict]:
+    return [dict(r) for r in conn.execute("SELECT * FROM crypto_signals ORDER BY ts DESC")]
+
+
+def update_crypto_signal(conn: sqlite3.Connection, sig_id: int, **fields) -> None:
+    if not fields:
+        return
+    sets = ", ".join(f"{k}=?" for k in fields)
+    conn.execute(f"UPDATE crypto_signals SET {sets} WHERE id=?", (*fields.values(), sig_id))
     conn.commit()
 
 

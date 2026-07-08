@@ -507,6 +507,60 @@ def cmd_backtest(config: Config) -> None:
                       "to restrict recommendations/execution to validated markets.[/dim]")
 
 
+def cmd_crypto_scan(config: Config, limit: int) -> None:
+    """Fetch crypto news, extract catalysts with Fable, log them as signals."""
+    from . import storage
+    from .crypto.run import scan_and_log
+
+    if not config.secrets.anthropic_api_key:
+        console.print("[yellow]Set ANTHROPIC_API_KEY (Fable) in .env to run the crypto agent.[/yellow]")
+        return
+    conn = storage.connect()
+    try:
+        logged = scan_and_log(config.secrets, conn, limit=limit)
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]crypto scan failed:[/red] {exc}")
+        return
+    live = [s for s in logged if s["status"] == "pending"]
+    console.print(f"Logged {len(live)} catalyst signals ({len(logged) - len(live)} skipped, no price).")
+    if not live:
+        console.print("[dim]No qualifying catalysts in the latest news.[/dim]")
+        return
+    table = Table(title="New crypto catalysts")
+    for col in ("asset", "dir", "type", "horiz", "conf", "thesis"):
+        table.add_column(col)
+    for s in live:
+        table.add_row(s["asset"], s["direction"], s["catalyst_type"],
+                      f"{s['horizon_hours']}h", f"{s['confidence']:.0%}", s["thesis"][:70])
+    console.print(table)
+
+
+def cmd_crypto_score(config: Config) -> None:
+    """Score matured signals and print the catalyst-agent leaderboard (the gate)."""
+    from . import storage
+    from .crypto.score import leaderboard, score_matured
+
+    conn = storage.connect()
+    n = score_matured(conn, config.secrets.coindesk_api_key)
+    lb = leaderboard(conn)
+    console.print(f"Scored {n} matured signals. {lb['pending']} still pending.")
+    if not lb["leaderboard"]:
+        console.print("[yellow]No scored signals yet.[/yellow] Run 'crypto-scan' regularly, "
+                      "then 'crypto-score' after catalysts' horizons elapse.")
+        return
+    table = Table(title="Catalyst agent — accuracy & edge by type")
+    table.add_column("type")
+    table.add_column("n", justify="right")
+    table.add_column("hit rate", justify="right")
+    table.add_column("mean signed move", justify="right")
+    for r in lb["leaderboard"]:
+        table.add_row(r["group"], str(r["n"]), f"{r['hit_rate']*100:.0f}%",
+                      f"{r['mean_signed_move']*100:+.2f}%")
+    console.print(table)
+    console.print("[dim]mean signed move > 0 across a real sample is the edge signal — "
+                  "hit rate alone can be a coin flip. Validate before trading.[/dim]")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="kalshi-optimizer")
     parser.add_argument("--config", default="config.yaml")
@@ -521,6 +575,9 @@ def main() -> None:
     p_cal.add_argument("sport", help="sport key, e.g. mlb or soccer")
     p_ana = sub.add_parser("analysts", help="generate AI analyst takes for a sport")
     p_ana.add_argument("sport", help="sport key, e.g. mlb or soccer")
+    p_cscan = sub.add_parser("crypto-scan", help="Fable crypto catalyst scan -> logged signals")
+    p_cscan.add_argument("--limit", type=int, default=30, help="news articles to consider")
+    sub.add_parser("crypto-score", help="score matured catalyst signals (the crypto gate)")
     sub.add_parser("auth-check", help="verify Kalshi API auth on a private endpoint")
     sub.add_parser("dashboard", help="launch the web dashboard (phase 5)")
     p_snap = sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
@@ -559,6 +616,14 @@ def main() -> None:
 
     if args.command == "snapshot":
         cmd_snapshot(config, loop_minutes=args.loop)
+        return
+
+    if args.command == "crypto-scan":
+        cmd_crypto_scan(config, args.limit)
+        return
+
+    if args.command == "crypto-score":
+        cmd_crypto_score(config)
         return
 
     {

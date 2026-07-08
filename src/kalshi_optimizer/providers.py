@@ -64,15 +64,27 @@ def _gemini(prompt: str, system: str | None, key: str) -> str:
     raise RuntimeError("no Gemini model available")
 
 
-def _anthropic(prompt: str, system: str | None, key: str) -> str:
+def _anthropic(prompt: str, system: str | None, key: str,
+               model: str = "claude-haiku-4-5-20251001", max_tokens: int = 500) -> str:
     r = requests.post("https://api.anthropic.com/v1/messages",
                       headers={"x-api-key": key, "anthropic-version": "2023-06-01",
                                "content-type": "application/json"},
-                      json={"model": "claude-haiku-4-5-20251001", "max_tokens": 500,
+                      json={"model": model, "max_tokens": max_tokens,
                             "system": system or "", "messages": [{"role": "user", "content": prompt}]},
-                      timeout=30)
+                      timeout=60)
     r.raise_for_status()
     return r.json()["content"][0]["text"]
+
+
+def fable_complete(prompt: str, system: str | None, secrets, max_tokens: int = 2048) -> str:
+    """Reasoning calls for the crypto catalyst agent, on Fable (claude-fable-5).
+
+    Fable's strength is reading and reasoning over messy news/announcement text —
+    the edge in semi-efficient crypto markets, unlike sharp sports lines."""
+    key = getattr(secrets, "anthropic_api_key", "")
+    if not key:
+        raise RuntimeError("Fable needs ANTHROPIC_API_KEY set in .env")
+    return _anthropic(prompt, system, key, model="claude-fable-5", max_tokens=max_tokens)
 
 
 def _openai(prompt: str, system: str | None, key: str) -> str:

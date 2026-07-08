@@ -51,8 +51,9 @@ class Secrets:
     odds_api_key: str = ""
     gemini_api_key: str = ""        # free tier: aistudio.google.com
     gemini_model: str = ""          # optional override, e.g. gemini-2.5-flash
-    anthropic_api_key: str = ""
+    anthropic_api_key: str = ""     # Fable (claude-fable-5) for the crypto agent
     openai_api_key: str = ""
+    coindesk_api_key: str = ""      # CoinDesk Data API (news + prices)
 
     @classmethod
     def from_env(cls) -> "Secrets":
@@ -67,6 +68,7 @@ class Secrets:
             gemini_model=os.getenv("GEMINI_MODEL", ""),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+            coindesk_api_key=os.getenv("COINDESK_API_KEY", ""),
         )
 
 
