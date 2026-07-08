@@ -10,11 +10,23 @@ unit-tested; the network call is a thin wrapper.
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime, timezone
 
-from ..providers import fable_complete
+from ..providers import fable_complete, llm_complete, provider_name
 from .news import Article
+
+
+def _complete(prompt: str, system: str, secrets) -> str:
+    """Run the reasoning call on a FREE model by default (Gemini free tier, the
+    same one the sports analysts use). Opt into paid Fable only if you set
+    CRYPTO_LLM=fable — so nothing here costs money unless you choose it."""
+    if os.getenv("CRYPTO_LLM", "").lower() == "fable":
+        return fable_complete(prompt, system, secrets)
+    if not provider_name(secrets):
+        raise RuntimeError("Set GEMINI_API_KEY (free tier: aistudio.google.com) in .env")
+    return llm_complete(prompt, system, secrets)
 
 DIRECTIONS = {"up", "down", "neutral"}
 MAGNITUDES = {"small", "medium", "large"}
@@ -103,9 +115,8 @@ def extract_catalysts(articles: list[Article], secrets) -> list[dict]:
         return []
     valid = {a.id for a in articles}
     by_id = {a.id: a for a in articles}
-    text = fable_complete(build_prompt(articles),
-                          system="You are a sharp, skeptical crypto markets analyst.",
-                          secrets=secrets)
+    text = _complete(build_prompt(articles),
+                     "You are a sharp, skeptical crypto markets analyst.", secrets)
     ts = datetime.now(timezone.utc).isoformat()
     out = []
     for s in dedup(parse_signals(text, valid)):

@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 from kalshi_optimizer import storage
-from kalshi_optimizer.crypto import catalysts, score
+from kalshi_optimizer.crypto import backtest, catalysts, news, score
 
 
 def test_parse_signals_validates_and_normalizes():
@@ -60,6 +60,27 @@ def test_score_matured_grades_after_horizon(tmp_path, monkeypatch):
     row = next(r for r in lb["leaderboard"] if r["group"] == "listing")
     assert row["n"] == 1 and row["hit_rate"] == 1.0
     assert row["mean_signed_move"] == 0.05
+
+
+def test_price_at_picks_last_candle_before_ts():
+    series = [(100, 10.0), (200, 11.0), (300, 12.0)]
+    assert news.price_at(series, 250) == 11.0     # last close at/before 250
+    assert news.price_at(series, 300) == 12.0
+    assert news.price_at(series, 50) is None       # nothing before ts
+
+
+def test_backtest_leaderboard_computes_edge():
+    scored = [
+        {"catalyst_type": "unlock", "direction": "down", "move_pct": -0.04, "correct": True},
+        {"catalyst_type": "unlock", "direction": "down", "move_pct": 0.02, "correct": False},
+        {"catalyst_type": "listing", "direction": "up", "move_pct": 0.05, "correct": True},
+    ]
+    board = {r["group"]: r for r in backtest._leaderboard(scored)}
+    assert board["ALL"]["n"] == 3
+    unlock = board["unlock"]
+    # signed move: down/-0.04 -> +0.04 ; down/+0.02 -> -0.02 ; mean = +0.01
+    assert unlock["n"] == 2 and unlock["hit_rate"] == 0.5
+    assert unlock["mean_signed_move"] == 0.01
 
 
 def test_score_skips_immature_signals(tmp_path):

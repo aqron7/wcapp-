@@ -511,9 +511,10 @@ def cmd_crypto_scan(config: Config, limit: int) -> None:
     """Fetch crypto news, extract catalysts with Fable, log them as signals."""
     from . import storage
     from .crypto.run import scan_and_log
+    from .providers import provider_name
 
-    if not config.secrets.anthropic_api_key:
-        console.print("[yellow]Set ANTHROPIC_API_KEY (Fable) in .env to run the crypto agent.[/yellow]")
+    if not provider_name(config.secrets):
+        console.print("[yellow]Set GEMINI_API_KEY (free) in .env to run the crypto agent.[/yellow]")
         return
     conn = storage.connect()
     try:
@@ -561,6 +562,37 @@ def cmd_crypto_score(config: Config) -> None:
                   "hit rate alone can be a coin flip. Validate before trading.[/dim]")
 
 
+def cmd_crypto_backtest(config: Config, days: int) -> None:
+    """Backtest the catalyst agent on recent history — a same-day read."""
+    from .crypto.backtest import run_backtest
+    from .providers import provider_name
+
+    if not provider_name(config.secrets):
+        console.print("[yellow]Set GEMINI_API_KEY (free) in .env to run the crypto agent.[/yellow]")
+        return
+    console.print(f"Backtesting catalysts over the last {days} days…")
+    try:
+        res = run_backtest(config.secrets, days_back=days)
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]crypto backtest failed:[/red] {exc}")
+        return
+    if not res["n"]:
+        console.print(f"[yellow]Nothing scorable.[/yellow] ({res.get('articles', 0)} articles, "
+                      f"{res.get('flagged', 0)} flagged) — try a longer --days window.")
+        return
+    console.print(f"{res['articles']} articles -> {res['flagged']} catalysts -> {res['n']} scored")
+    table = Table(title="Catalyst backtest — accuracy & edge by type")
+    for col in ("type", "n", "hit rate", "mean signed move"):
+        table.add_column(col, justify="right" if col != "type" else "left")
+    for r in res["leaderboard"]:
+        table.add_row(r["group"], str(r["n"]), f"{r['hit_rate']*100:.0f}%",
+                      f"{r['mean_signed_move']*100:+.2f}%")
+    console.print(table)
+    console.print("[dim]⚠ Hindsight-biased: Fable may know old outcomes, so these read "
+                  "optimistically. Use to shake out the pipeline; confirm forward with "
+                  "crypto-scan + crypto-score.[/dim]")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="kalshi-optimizer")
     parser.add_argument("--config", default="config.yaml")
@@ -575,9 +607,11 @@ def main() -> None:
     p_cal.add_argument("sport", help="sport key, e.g. mlb or soccer")
     p_ana = sub.add_parser("analysts", help="generate AI analyst takes for a sport")
     p_ana.add_argument("sport", help="sport key, e.g. mlb or soccer")
-    p_cscan = sub.add_parser("crypto-scan", help="Fable crypto catalyst scan -> logged signals")
+    p_cscan = sub.add_parser("crypto-scan", help="crypto catalyst scan -> logged signals")
     p_cscan.add_argument("--limit", type=int, default=30, help="news articles to consider")
     sub.add_parser("crypto-score", help="score matured catalyst signals (the crypto gate)")
+    p_cbt = sub.add_parser("crypto-backtest", help="backtest catalysts on recent history (same-day read)")
+    p_cbt.add_argument("--days", type=int, default=14, help="days of news history to test")
     sub.add_parser("auth-check", help="verify Kalshi API auth on a private endpoint")
     sub.add_parser("dashboard", help="launch the web dashboard (phase 5)")
     p_snap = sub.add_parser("snapshot", help="record live prices + fair values to the DB (phase 3)")
@@ -624,6 +658,10 @@ def main() -> None:
 
     if args.command == "crypto-score":
         cmd_crypto_score(config)
+        return
+
+    if args.command == "crypto-backtest":
+        cmd_crypto_backtest(config, args.days)
         return
 
     {

@@ -14,6 +14,7 @@ import requests
 # CoinDesk Data (formerly CryptoCompare) public data API.
 NEWS_URL = "https://min-api.cryptocompare.com/data/v2/news/"
 PRICE_URL = "https://min-api.cryptocompare.com/data/price"
+HISTOHOUR_URL = "https://min-api.cryptocompare.com/data/v2/histohour"
 
 
 @dataclass
@@ -31,9 +32,13 @@ def _auth(api_key: str) -> dict:
     return {"authorization": f"Apikey {api_key}"} if api_key else {}
 
 
-def fetch_news(api_key: str = "", lang: str = "EN", limit: int = 30) -> list[Article]:
-    """Most recent crypto news articles, newest first."""
-    r = requests.get(NEWS_URL, params={"lang": lang}, headers=_auth(api_key), timeout=30)
+def fetch_news(api_key: str = "", lang: str = "EN", limit: int = 30,
+               before_ts: int | None = None) -> list[Article]:
+    """Crypto news articles, newest first. ``before_ts`` pages back in time."""
+    params: dict = {"lang": lang}
+    if before_ts:
+        params["lTs"] = int(before_ts)   # articles published before this unix ts
+    r = requests.get(NEWS_URL, params=params, headers=_auth(api_key), timeout=30)
     r.raise_for_status()
     items = r.json().get("Data", [])[:limit]
     out: list[Article] = []
@@ -56,3 +61,25 @@ def spot_price(symbol: str, api_key: str = "", quote: str = "USD") -> float | No
                      headers=_auth(api_key), timeout=30)
     r.raise_for_status()
     return r.json().get(quote.upper())
+
+
+def fetch_hourly(symbol: str, api_key: str = "", quote: str = "USD",
+                 hours: int = 2000) -> list[tuple[int, float]]:
+    """Hourly (unix_ts, close) history for ``symbol``, oldest first. ~2000h max."""
+    r = requests.get(HISTOHOUR_URL, headers=_auth(api_key), timeout=30,
+                     params={"fsym": symbol.upper(), "tsym": quote.upper(),
+                             "limit": min(2000, hours)})
+    r.raise_for_status()
+    data = r.json().get("Data", {}).get("Data", [])
+    return [(int(c["time"]), float(c["close"])) for c in data if c.get("close")]
+
+
+def price_at(series: list[tuple[int, float]], ts: int) -> float | None:
+    """Close of the last hourly candle at or before ``ts`` (series is time-sorted)."""
+    picked = None
+    for t, close in series:
+        if t <= ts:
+            picked = close
+        else:
+            break
+    return picked
