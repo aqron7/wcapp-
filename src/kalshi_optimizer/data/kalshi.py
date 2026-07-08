@@ -151,6 +151,11 @@ class KalshiClient:
         }
 
     def _headers(self, method: str, route: str) -> dict[str, str]:
+        # Market-data endpoints are public; only sign when a key is loaded so
+        # arb/edge scans work without credentials. Private endpoints that need
+        # auth call _sign directly (and still raise if the key is missing).
+        if self._private_key is None:
+            return {}
         return self._sign(method, self.base_path + route)
 
     def _get(self, route: str, params: dict | None = None) -> dict:
@@ -159,11 +164,17 @@ class KalshiClient:
         resp.raise_for_status()
         return resp.json()
 
+    def _require_key(self) -> None:
+        if self._private_key is None:
+            raise RuntimeError("Kalshi private key not loaded; set KALSHI_PRIVATE_KEY_PATH")
+
     def auth_check(self) -> dict:
         """Hit an authenticated endpoint to verify RSA signing actually works."""
+        self._require_key()
         return self._get("/portfolio/balance")
 
     def _post(self, route: str, body: dict) -> dict:
+        self._require_key()
         url = f"{self.base}{route}"
         headers = self._headers("POST", route)
         headers["Content-Type"] = "application/json"
